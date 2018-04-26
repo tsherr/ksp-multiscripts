@@ -1,0 +1,275 @@
+{Multichannel CC Transformer
+ 	
+	Version History:
+	v1.0 - Initial Implementation
+}
+
+{ #pragma save_compiled_source multichannel_cc_transformer_v1.0_compiled.txt }
+
+on init
+
+	{------------------------INSTRUMENT INFO------------------------}
+	CreateVersionNumber(VERSION_NUM)
+	declare @SCRIPT_TITLE
+	SCRIPT_TITLE := "Multichannel CC Transformer"
+
+	{------------------------CONSTANTS------------------------}
+	declare const UI_HEIGHT_PX := 100
+	declare const LABEL_FONT_WHITE := 17
+	declare const LABEL_FONT_BLACK := 16
+	declare const LABEL_FONT_SMALL := 12
+	declare const TRANSFORM_TYPE_DO_NOTHING := 0
+	declare const TRANSFORM_TYPE_COPY := 1
+	declare const TRANSFORM_TYPE_CHANGE := 2
+	declare const TARGET_TYPE_ALLOW := 0
+	declare const TARGET_TYPE_IGNORE := 1
+
+	//General
+	define TRUE := 1
+	define FALSE := 0
+	define UNDEFINED := 01
+
+	//GUI
+	define KONTAKT_HEADER_HEIGHT_PX	 := 68
+	define KONTAKT_PEFRVIEW_WIDTH := 632
+
+	//ROUND ROBIN
+	define RR_MODE_GLOBAL := 0
+	define RR_MODE_PER_KEY := 1
+	define RR_TYPE_SEQUENTIAL := 0
+	define RR_TYPE_RANDOM := 1
+	define RR_TYPE_RANDOM_NO_REPEAT := 2
+	define RR_TYPE_FC_RANDOM := 3 //full-cycle random
+
+	//TEXT ALIGN
+	define TEXT_ALIGN_LEFT := 0
+	define TEXT_ALIGN_CENTER := 1
+	define TEXT_ALIGN_RIGHT := 2
+
+	//ARRAYS
+	define ARRAY_SORT_ASCENDING := 0
+	define ARRAY_SORT_DESCENDING := 1
+
+	//MIDI CCs
+	define MOD_CC := 1
+	define VOL_CC := 7
+	define EXP_CC := 11
+	define SUS_CC := 64
+
+	{------------------------GUI------------------------}
+	//Setup
+	message("")
+	set_ui_height_px(UI_HEIGHT_PX)
+	set_script_title(SCRIPT_TITLE)
+
+	declare ui_label channel_select_background(1, 1)
+	channel_select_background -> text := ""
+	channel_select_background -> width := 150
+	channel_select_background -> height := 75
+	channel_select_background -> x := 70
+	channel_select_background -> y := 2
+
+	declare ui_label channel_select_label(1, 1)
+	channel_select_label -> text := "Channel:"
+	channel_select_label -> text_alignment := TEXT_ALIGN_CENTER
+	channel_select_label -> font_type := LABEL_FONT_WHITE
+	channel_select_label -> width := channel_select_background -> width
+	channel_select_label -> x := channel_select_background -> x
+	channel_select_label -> y := 10
+
+	declare ui_menu channel_select
+	channel_select -> y := 30
+	channel_select -> width := (channel_select_background -> width) - 30
+	channel_select -> x := (channel_select_background -> x) + (((channel_select_background -> width) - (channel_select -> width)) / 2)
+
+	declare ui_menu transform_type
+	transform_type -> y := channel_select -> y
+	transform_type -> x := 240
+	transform_type -> width := 75
+
+	declare ui_value_edit source_cc(0, 127, 1)
+	source_cc -> y := transform_type -> y
+	source_cc -> x := (transform_type -> x) + (transform_type -> width) + 10
+	source_cc -> width := 75
+	source_cc -> text := "CC"
+
+	declare ui_label values_to_label(1, 1)
+	values_to_label -> y := transform_type -> y
+	values_to_label -> x := (source_cc -> x) + (source_cc -> width) + 10
+	values_to_label -> width := 60
+	values_to_label -> text := "values to"
+	values_to_label -> hide := HIDE_PART_BG
+	values_to_label -> font_type := LABEL_FONT_BLACK
+
+	declare ui_value_edit target_cc(0, 127, 1)
+	target_cc -> y := transform_type -> y
+	target_cc -> x := (values_to_label -> x) + (values_to_label -> width) + 10
+	target_cc -> width := 75
+	target_cc -> text := "CC"
+
+	declare ui_label and_label(1, 1)
+	and_label -> y := (transform_type -> y) + 25
+	and_label -> x := (transform_type -> x)
+	and_label -> width := 30
+	and_label -> text := "and"
+	and_label -> hide := HIDE_PART_BG
+	and_label -> font_type := LABEL_FONT_BLACK
+
+	declare ui_menu ignore_type
+	ignore_type -> y := and_label -> y
+	ignore_type -> x := (and_label -> x) + (and_label -> width) + 10
+	ignore_type -> width := 75
+
+	declare ui_label on_target_label(1, 1)
+	on_target_label -> y := and_label -> y
+	on_target_label -> x := (ignore_type -> x) + (ignore_type -> width) + 10
+	on_target_label -> width := 100
+	on_target_label -> text := "other CC 0 values."
+	on_target_label -> hide := HIDE_PART_BG
+	on_target_label -> font_type := LABEL_FONT_BLACK
+
+	//Version
+	declare ui_label VersionInfo(0, 0)
+	VersionInfo -> width := 300
+	VersionInfo -> height := 15
+	VersionInfo -> x := KONTAKT_PEFRVIEW_WIDTH - (VersionInfo -> width)
+	VersionInfo -> y := UI_HEIGHT_PX - (VersionInfo -> height) - 4
+	VersionInfo -> text_alignment := TEXT_ALIGN_RIGHT
+	VersionInfo -> font_type := 15
+	VersionInfo -> hide := HIDE_PART_BG
+	VersionInfo -> text := SCRIPT_TITLE & " v" & VERSION_NUM
+
+	{------------------------VARIABLES------------------------}
+	declare transform_types[64]
+	declare source_ccs[64]
+	declare target_ccs[64]
+	declare ignore_types[64]
+	declare temp
+	declare i
+
+	{------------------------INITIALIZATION------------------------}
+	add_menu_item(transform_type, "Do Nothing", TRANSFORM_TYPE_DO_NOTHING)
+	add_menu_item(transform_type, "Copy", TRANSFORM_TYPE_COPY)
+	add_menu_item(transform_type, "Change", TRANSFORM_TYPE_CHANGE)
+	add_menu_item(ignore_type, "Allow", TARGET_TYPE_ALLOW)
+	add_menu_item(ignore_type, "Ignore", TARGET_TYPE_IGNORE)
+
+	for i := 0 to 63
+		add_menu_item(channel_select, i+1, i)
+	end for
+
+	make_persistent(channel_select)
+	make_persistent(source_cc)
+	make_persistent(target_cc)
+	make_persistent(ignore_type)
+	make_persistent(values_to_label)
+	make_persistent(and_label)
+	make_persistent(on_target_label)
+	make_persistent(transform_types)
+	make_persistent(source_ccs)
+	make_persistent(target_ccs)
+	make_persistent(ignore_types)	
+	make_persistent(on_target_label)
+
+	read_persistent_var(channel_select)
+	read_persistent_var(source_cc)
+	read_persistent_var(target_cc)
+	read_persistent_var(ignore_type)
+	read_persistent_var(values_to_label)
+	read_persistent_var(and_label)
+	read_persistent_var(on_target_label)
+	read_persistent_var(transform_types)
+	read_persistent_var(source_ccs)
+	read_persistent_var(target_ccs)
+	read_persistent_var(ignore_types)	
+	read_persistent_var(on_target_label)
+	
+
+	OnChannelSelect(channel_select)
+end on
+
+function OnChannelSelect(channel)
+	transform_type := transform_types[channel]
+	source_cc := source_ccs[channel]
+	target_cc := target_ccs[channel]
+	ignore_type := ignore_types[channel]
+	hideOrShowTransformControls()
+	on_target_label -> text := "other CC " & target_cc & " values."
+end function
+
+on ui_control(channel_select)
+	OnChannelSelect(channel_select)
+end on
+
+function hideOrShowTransformControls()
+	if (transform_type = TRANSFORM_TYPE_DO_NOTHING)
+		source_cc -> hide := HIDE_WHOLE_CONTROL
+		target_cc -> hide := HIDE_WHOLE_CONTROL
+		ignore_type -> hide := HIDE_WHOLE_CONTROL
+		values_to_label -> hide := HIDE_WHOLE_CONTROL
+		and_label -> hide := HIDE_WHOLE_CONTROL
+		on_target_label -> hide := HIDE_WHOLE_CONTROL
+	else
+		source_cc -> hide := HIDE_PART_NOTHING
+		target_cc -> hide := HIDE_PART_NOTHING
+		ignore_type -> hide := HIDE_PART_NOTHING
+		values_to_label -> hide := HIDE_PART_BG
+		and_label -> hide := HIDE_PART_BG
+		on_target_label -> hide := HIDE_PART_BG
+	end if
+end function
+
+macro CreateVersionNumber(#varname#)
+
+	declare @VERSION_MAJOR
+	declare @VERSION_MINOR
+
+	VERSION_MAJOR := "1"
+	VERSION_MINOR := "0"
+
+	declare @#varname#
+	#varname# := VERSION_MAJOR & "." & VERSION_MINOR
+end macro
+
+on ui_control(transform_type)
+	transform_types[channel_select] := transform_type
+	call hideOrShowTransformControls()
+end on
+
+on ui_control(source_cc)
+	source_ccs[channel_select] := source_cc
+end on
+
+on ui_control(target_cc)
+	target_ccs[channel_select] := target_cc
+	on_target_label -> text := "other CC " & target_cc & " values."
+end on
+
+on ui_control(ignore_type)
+	ignore_types[channel_select] := ignore_type
+end on
+
+{**********midi_in**********}
+on midi_in
+
+	if ((transform_types[MIDI_CHANNEL] # TRANSFORM_TYPE_DO_NOTHING) and (MIDI_COMMAND = MIDI_COMMAND_CC))// The transformer is on for this channel, and it's a CC message
+
+		if (MIDI_BYTE_1 = source_ccs[MIDI_CHANNEL]) //Does this CC# match our source CC?
+
+			//create a new MIDI message for the target CC
+			set_midi(MIDI_CHANNEL, MIDI_COMMAND_CC, target_ccs[MIDI_CHANNEL], MIDI_BYTE_2)
+
+			if (transform_types[MIDI_CHANNEL] = TRANSFORM_TYPE_CHANGE)
+				//Need to suppress the original CC message
+				ignore_midi()
+			end if
+		end if
+
+		//Are we supressing messages coming from the target CC?
+		if ((ignore_types[MIDI_CHANNEL] = TARGET_TYPE_IGNORE) and (MIDI_BYTE_1 = target_ccs[MIDI_CHANNEL]))
+			ignore_midi()
+		end if
+
+	end if	
+
+end on

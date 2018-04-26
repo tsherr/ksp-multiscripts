@@ -1,0 +1,1089 @@
+{Auto Divisi - Automatically distributes notes in a polyphonic context to multiple Kontakt instruments
+Author: Toby Sherriff - www.tobysherriff.net
+
+Changelog:
+	v1.4 - Added an option to enforce unison (monophonic) playing. Unison playback can be triggered when a certain CC goes above a specific threshold
+    v1.3 - Added some more mouseover help text, fixed note limit display, adjusted default and max buffer values
+	v1.2 - Fixed a bug where the script would think it was holding more notes than it was; Fixed a bug where the most recent/oldest held notes would not be correct
+    v1.1 - Rewrote buffer implementation. All MIDI commands now get buffered, not just note-ons.
+    v1.0 - Initial implementation
+}
+
+{ #pragma save_compiled_source auto-divisi_v1.4_compiled.txt }
+
+on init            
+
+	declare @VERSION_NUMBER
+	@VERSION_NUMBER := "1.4"
+
+    {***Globals and constants***}
+    declare const $TRUE := 1
+    declare const $FALSE := 0
+    declare const $MAX_POLY := 16 {at most 16 notes may be held (can only distribute onto 16 channels)}
+    declare const $STEAL_NEWEST := 0
+    declare const $STEAL_OLDEST := 1
+    declare const $STEAL_CLOSEST := 2
+    declare const $PREFER_LOWER := 0
+    declare const $PREFER_HIGHER := 1
+    declare const $IN_QUEUE_LENGTH := 128 {The number of items in the in queue (not the number of indicies)}
+    declare const $IN_QUEUE_ELEMENT_WIDTH := 3 {the number of array indicies used by each item in queue item}
+    declare @debug_msg
+    declare $lock := 0 {for restricting access to critical sections}
+    declare $lock_owner_ID := -1 {The caller ID of the thread that own's the lock}
+    declare %held_notes[128] {each index corresponds to a note number, the value represents the time (in ms, since Kontakt started) that the note was pressed (-1 = not held)}
+    declare $held_notes_count := 0
+    declare $held_notes_iterator := 0
+    declare %in_queue[$IN_QUEUE_LENGTH * $IN_QUEUE_ELEMENT_WIDTH] {Holds note on/offs until they're ready to be processed. 3 Successive values are type (on/off), note#, and velocity}
+    declare $in_queue_count := 0
+    declare $in_queue_iterator := 0
+    declare %voices[$MAX_POLY] {Each index corresponds to a midi channel, and the value is the note number being played (-1 = no note)}
+    declare %temp_voices[$MAX_POLY] {A working copy of %voices}
+    declare $buffer_active := $FALSE {Buffers note-ons to avoid chords being interpereted as arpeggios}   
+    declare $most_recent_velocity := -1 {The velocity of the most recently played note}
+         
+    {***Reserved variables***}    
+    declare $control_index := 0
+    declare $current_mono_cc_val := 0
+    declare $most_recent_note := -1
+
+    {***General purpose parameters and return values for user functions***}
+    declare $p0
+    declare $p1
+    declare $p2
+    declare $r0
+    declare $r1
+    
+    {***General purpose "Stack" variables***}
+    declare $i
+    declare $j
+    declare $n
+    declare $temp
+    declare $removed
+    declare $time_compare
+    
+    {***UI Setup***}
+    message("") {Clear status line}
+    set_script_title("Auto-divisi") 
+    set_ui_height_px(150)
+
+    {Script info}
+    declare ui_label $title(1, 1)
+    set_text($title, "Auto-divisi " & "v" & @VERSION_NUMBER & " - www.tobysherriff.net")
+    move_control_px($title, 60, 130)
+    hide_part($title, $HIDE_PART_BG)
+    set_control_par(get_ui_id($title), $CONTROL_PAR_WIDTH, 200)
+    set_control_par(get_ui_id($title), $CONTROL_PAR_HEIGHT, 18)
+    set_control_par(get_ui_id($title), $CONTROL_PAR_FONT_TYPE, 12)
+
+    declare !port_letters[4]
+    declare !note_letters[12]
+    declare !note_names[128]
+    !port_letters[0] := "A"
+    !port_letters[1] := "B"
+    !port_letters[2] := "C"
+    !port_letters[3] := "D"
+    !note_letters[0] := "C"
+    !note_letters[1] := "C#"
+    !note_letters[2] := "D"
+    !note_letters[3] := "D#"
+    !note_letters[4] := "E"
+    !note_letters[5] := "F"
+    !note_letters[6] := "F#"
+    !note_letters[7] := "G"
+    !note_letters[8] := "G#"
+    !note_letters[9] := "A"
+    !note_letters[10] := "A#"
+    !note_letters[11] := "B"
+
+    $i := 0
+    while ($i < 128)
+        !note_names[$i] := !note_letters[$i mod 12] & " " & (($i / 12) - 2)
+        inc($i)
+    end while
+
+    declare ui_knob $in_port(1, 4, 1) {(1 - 4 = A - D) Listen to MIDI data on this port}
+    declare ui_knob $out_port(1, 4, 1) {(1 - 4 = A - D) Send MIDI data on this port}
+    declare ui_knob $max_voices(1, 16, 1) {The number of voices to use for divisi}  
+    declare ui_knob $buffer_length_ms(0, 50, 1) {length of the buffer in ms}
+    declare ui_label $voice_stealing_mode_label(1, 1)
+    declare ui_label $note_doubling_mode_label(1, 1)
+    declare ui_menu $voice_stealing_mode
+    declare ui_menu $note_doubling_mode
+    declare ui_label $note_limits (1, 1)
+    declare ui_value_edit $low_limit(0, 128, $VALUE_EDIT_MODE_NOTE_NAMES)
+    declare ui_value_edit $high_limit(0, 128, $VALUE_EDIT_MODE_NOTE_NAMES)
+    declare ui_button $mono_enabled
+    declare ui_value_edit $mono_cc(0, 127, 1)
+    declare ui_value_edit $mono_threshold(0, 127, 1)
+    declare ui_button $mono_passthrough
+    declare ui_button $debug_enabled
+    declare ui_button $debug_auto_clear
+    declare ui_button $debug_clear
+    declare ui_label $debug_output(2, 3)
+    declare ui_label $voicebox0(1, 1)
+    declare ui_label $voicebox1(1, 1)
+    declare ui_label $voicebox2(1, 1)
+    declare ui_label $voicebox3(1, 1)
+    declare ui_label $voicebox4(1, 1)
+    declare ui_label $voicebox5(1, 1)
+    declare ui_label $voicebox6(1, 1)
+    declare ui_label $voicebox7(1, 1)
+    declare ui_label $voicebox8(1, 1)
+    declare ui_label $voicebox9(1, 1)
+    declare ui_label $voicebox10(1, 1)
+    declare ui_label $voicebox11(1, 1)
+    declare ui_label $voicebox12(1, 1)
+    declare ui_label $voicebox13(1, 1)
+    declare ui_label $voicebox14(1, 1)
+    declare ui_label $voicebox15(1, 1)
+    declare %voiceboxIDs[16]
+    %voiceboxIDs[0] := get_ui_id($voicebox0)
+    %voiceboxIDs[1] := get_ui_id($voicebox1)
+    %voiceboxIDs[2] := get_ui_id($voicebox2)
+    %voiceboxIDs[3] := get_ui_id($voicebox3)
+    %voiceboxIDs[4] := get_ui_id($voicebox4)
+    %voiceboxIDs[5] := get_ui_id($voicebox5)
+    %voiceboxIDs[6] := get_ui_id($voicebox6)
+    %voiceboxIDs[7] := get_ui_id($voicebox7)
+    %voiceboxIDs[8] := get_ui_id($voicebox8)
+    %voiceboxIDs[9] := get_ui_id($voicebox9)
+    %voiceboxIDs[10] := get_ui_id($voicebox10)
+    %voiceboxIDs[11] := get_ui_id($voicebox11)
+    %voiceboxIDs[12] := get_ui_id($voicebox12)
+    %voiceboxIDs[13] := get_ui_id($voicebox13)
+    %voiceboxIDs[14] := get_ui_id($voicebox14)
+    %voiceboxIDs[15] := get_ui_id($voicebox15)
+
+    make_persistent($in_port)
+    make_persistent($out_port)
+    make_persistent($max_voices)
+    make_persistent($buffer_length_ms)
+    make_persistent($voice_stealing_mode)
+    make_persistent($note_doubling_mode)
+    make_persistent($low_limit)
+    make_persistent($high_limit)
+    make_persistent($mono_enabled)
+    make_persistent($mono_passthrough)
+    make_persistent($mono_cc)
+    make_persistent($mono_threshold)
+
+    $i := 0
+    while ($i < 16)
+        set_control_par_str(%voiceboxIDs[$i], $CONTROL_PAR_TEXT, "" & $i + 1 & ": ")
+        inc($i)
+    end while
+    set_text($in_port, "In Port")
+    set_text($out_port, "Out Port")
+    set_text($max_voices, "Voices")
+    set_text($buffer_length_ms, "Buffer")
+    set_text($voice_stealing_mode_label, "Voice Stealing:")
+    set_text($note_doubling_mode_label, "Note Doubling:")
+    add_menu_item($voice_stealing_mode, "Steal Newest", $STEAL_NEWEST)
+    add_menu_item($voice_stealing_mode, "Steal Oldest", $STEAL_OLDEST)
+    add_menu_item($voice_stealing_mode, "Steal Closest", $STEAL_CLOSEST)
+    add_menu_item($note_doubling_mode, "Prefer Lower Notes", $PREFER_LOWER)
+    add_menu_item($note_doubling_mode, "Prefer Higher Notes", $PREFER_HIGHER)
+    set_text($note_limits, "Note Limits:")
+    set_text($low_limit, "")
+    set_text($high_limit, "")
+    set_text($mono_passthrough, "Pass.")
+    set_text($mono_cc, "CC")
+    set_text($mono_threshold, "Thr")
+    set_text($debug_enabled, "Show Debug")
+    set_text($debug_auto_clear, "Autoclear")
+    set_text($debug_clear, "Clear")
+    set_text($debug_output, "")
+
+    set_control_par(get_ui_id($voice_stealing_mode), $CONTROL_PAR_WIDTH, 120)
+    set_control_par(get_ui_id($note_doubling_mode), $CONTROL_PAR_WIDTH, 120)
+    set_control_par(get_ui_id($low_limit), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($high_limit), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($mono_cc), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($mono_threshold), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($mono_passthrough), $CONTROL_PAR_WIDTH, 40)
+    set_control_par(get_ui_id($debug_auto_clear), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($debug_clear), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($debug_output), $CONTROL_PAR_WIDTH, 212)
+    set_control_par(get_ui_id($debug_output), $CONTROL_PAR_HEIGHT, 35)
+    
+    move_control($in_port, 1, 1)
+    move_control($out_port, 2, 1)
+    move_control($max_voices, 3, 1)
+    move_control($buffer_length_ms, 4, 1)
+    move_control($voice_stealing_mode_label, 5, 1)
+    move_control($note_doubling_mode_label, 5, 2)
+    move_control($note_limits, 5, 3)
+    set_control_par(get_ui_id($voice_stealing_mode), $CONTROL_PAR_POS_X, 520)
+    set_control_par(get_ui_id($voice_stealing_mode), $CONTROL_PAR_POS_Y, 2)
+    set_control_par(get_ui_id($note_doubling_mode), $CONTROL_PAR_POS_X, 520)
+    set_control_par(get_ui_id($note_doubling_mode), $CONTROL_PAR_POS_Y, 23)
+    set_control_par(get_ui_id($low_limit), $CONTROL_PAR_POS_X, 520)
+    set_control_par(get_ui_id($low_limit), $CONTROL_PAR_POS_Y, 44)
+    set_control_par(get_ui_id($high_limit), $CONTROL_PAR_POS_X, 585)
+    set_control_par(get_ui_id($high_limit), $CONTROL_PAR_POS_Y, 44)
+    set_control_par(get_ui_id($mono_enabled), $CONTROL_PAR_POS_X, 428)
+    set_control_par(get_ui_id($mono_passthrough), $CONTROL_PAR_POS_X, 475)
+    set_control_par(get_ui_id($mono_cc), $CONTROL_PAR_POS_X, 520)
+    set_control_par(get_ui_id($mono_threshold), $CONTROL_PAR_POS_X, 585)    
+    set_control_par(get_ui_id($mono_enabled), $CONTROL_PAR_POS_Y, 65)
+    set_control_par(get_ui_id($mono_passthrough), $CONTROL_PAR_POS_Y, 65)
+    set_control_par(get_ui_id($mono_cc), $CONTROL_PAR_POS_Y, 65)
+    set_control_par(get_ui_id($mono_threshold), $CONTROL_PAR_POS_Y, 65)
+    set_control_par(get_ui_id($debug_auto_clear), $CONTROL_PAR_POS_X, 520)
+    set_control_par(get_ui_id($debug_auto_clear), $CONTROL_PAR_POS_Y, 86)
+    set_control_par(get_ui_id($debug_clear), $CONTROL_PAR_POS_X, 585)
+    set_control_par(get_ui_id($debug_clear), $CONTROL_PAR_POS_Y, 86)
+    move_control($debug_enabled, 5, 5)
+    move_control_px($debug_output, 428, 107)
+    move_control($voicebox0, 1, 3)
+    move_control($voicebox1, 2, 3)
+    move_control($voicebox2, 3, 3)
+    move_control($voicebox3, 4, 3)
+    move_control($voicebox4, 1, 4)
+    move_control($voicebox5, 2, 4)
+    move_control($voicebox6, 3, 4)
+    move_control($voicebox7, 4, 4)
+    move_control($voicebox8, 1, 5)
+    move_control($voicebox9, 2, 5)
+    move_control($voicebox10, 3, 5)
+    move_control($voicebox11, 4, 5)
+    move_control($voicebox12, 1, 6)
+    move_control($voicebox13, 2, 6)
+    move_control($voicebox14, 3, 6)
+    move_control($voicebox15, 4, 6)
+
+    set_control_par(get_ui_id($debug_clear), $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+    set_control_par(get_ui_id($debug_auto_clear), $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+    set_control_par(get_ui_id($debug_output), $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+
+    {default values}
+    $buffer_length_ms := 20
+    set_knob_defval($buffer_length_ms, $buffer_length_ms)
+    $max_voices := 4
+    set_knob_defval($max_voices, $max_voices)
+    $low_limit := 0
+    $high_limit := 127
+    $voice_stealing_mode := $STEAL_CLOSEST
+    $note_doubling_mode := $PREFER_LOWER
+    $mono_cc := 64
+    $mono_threshold := 64
+
+    {read the persistent state of max_voices to show/hide the voice boxes}    
+    read_persistent_var($max_voices)
+    $i := 0
+    while ($i < $MAX_POLY)
+        if ($i < $max_voices)
+            set_control_par(%voiceboxIDs[$i], $CONTROL_PAR_HIDE, $HIDE_PART_NOTHING)
+        else
+            set_control_par(%voiceboxIDs[$i], $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+        end if
+        inc($i)
+    end while
+
+    {Read the persistent state of the ports to set the knob values correctly}
+    read_persistent_var($in_port)
+    set_knob_label($in_port, !port_letters[$in_port - 1])
+    read_persistent_var($out_port)
+    set_knob_label($out_port, !port_letters[$out_port - 1])
+
+    {Read the persistent state of the mono button}
+    read_persistent_var($mono_enabled)
+	if ($mono_enabled = $TRUE)
+		set_text($mono_enabled, "Unison")
+    	set_control_par(get_ui_id($mono_enabled), $CONTROL_PAR_WIDTH, 40)
+		set_control_par(get_ui_id($mono_passthrough), $CONTROL_PAR_HIDE, $HIDE_PART_NOTHING)
+		set_control_par(get_ui_id($mono_cc), $CONTROL_PAR_HIDE, $HIDE_PART_NOTHING)
+		set_control_par(get_ui_id($mono_threshold), $CONTROL_PAR_HIDE, $HIDE_PART_NOTHING)
+	else
+		set_text($mono_enabled, "Unison (off)")
+		set_control_par(get_ui_id($mono_enabled), $CONTROL_PAR_WIDTH, 88)
+		set_control_par(get_ui_id($mono_passthrough), $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+		set_control_par(get_ui_id($mono_cc), $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+		set_control_par(get_ui_id($mono_threshold), $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+    end if
+
+    {***Other setup***}
+
+    {Control help}
+    set_control_help($in_port, "Set the MIDI port to listen on. MIDI messages on other ports will be ignored.")
+    set_control_help($out_port, "Set the MIDI port to which notes will be distributed.")
+    set_control_help($max_voices, "Sets the number of independent voices to use for divisi.")
+    set_control_help($buffer_length_ms, "Sets the length (ms) of the input buffer. A larger buffer will prevent unintended arpeggios and dropped notes, but will introduce latency.")
+    set_control_help($voice_stealing_mode, "Determines which note should be released if a new note requires an existing note to be dropped.")
+    set_control_help($note_doubling_mode, "Determines which notes should be doubled when multiple voices must play the same note.")
+    set_control_help($note_limits, "Determines the range in which divisi notes will be processed. Notes outside of this range will be sent to all channels, so keyswitches can still be used.")
+    set_control_help($low_limit, "The lowest MIDI note number to be processed for divisi.")
+    set_control_help($high_limit, "The highest MIDI note number to be processed for divisi.")
+    set_control_help($mono_enabled, "Enables or disables Unison (monophonic) mode. When enabled, unison playback can be enforced by an assignable CC and threshold.")
+    set_control_help($mono_passthrough, "If enabled, the CC values used to enforce unison playback will be passed through to the instruments.")
+    set_control_help($mono_cc, "The CC that will be used to enforce unison playback.")
+    set_control_help($mono_threshold, "Determines the CC threshold for unison mode; Values at or above this threshold will engage unison mode.")
+    set_control_help($debug_enabled, "Shows or hides the debug output pane.")
+    set_control_help($debug_auto_clear, "Automatically purge the debug output as notes are played.")
+    set_control_help($debug_clear, "Clears the debug output pane.")
+    set_control_help($voicebox0, "Shows the status of channel " & 1 & ".")
+    set_control_help($voicebox1, "Shows the status of channel " & 2 & ".")
+    set_control_help($voicebox2, "Shows the status of channel " & 3 & ".")
+    set_control_help($voicebox3, "Shows the status of channel " & 4 & ".")
+    set_control_help($voicebox4, "Shows the status of channel " & 5 & ".")
+    set_control_help($voicebox5, "Shows the status of channel " & 6 & ".")
+    set_control_help($voicebox6, "Shows the status of channel " & 7 & ".")
+    set_control_help($voicebox7, "Shows the status of channel " & 8 & ".")
+    set_control_help($voicebox8, "Shows the status of channel " & 9 & ".")
+    set_control_help($voicebox9, "Shows the status of channel " & 10 & ".")
+    set_control_help($voicebox10, "Shows the status of channel " & 11 & ".")
+    set_control_help($voicebox11, "Shows the status of channel " & 12 & ".")
+    set_control_help($voicebox12, "Shows the status of channel " & 13 & ".")
+    set_control_help($voicebox13, "Shows the status of channel " & 14 & ".")
+    set_control_help($voicebox14, "Shows the status of channel " & 15 & ".")
+    set_control_help($voicebox15, "Shows the status of channel " & 16 & ".") 
+
+    {initialize arrays}
+    $i := 0
+    while ($i < num_elements(%held_notes))
+        %held_notes[$i] := -1
+        inc($i)
+    end while
+    $held_notes_count := 0
+    $i := 0
+    while ($i < num_elements(%voices))
+        %voices[$i] := -1
+        inc($i)
+    end while
+    $i := 0
+    while ($i < num_elements(%temp_voices))
+        %temp_voices[$i] := -1
+        inc($i)
+    end while
+    $i := 0
+    while ($i < num_elements(%in_queue))
+        %in_queue[$i] := -1
+        inc($i)
+    end while
+    $in_queue_count := 0
+
+end on
+
+{****************User Functions****************}
+
+{PrintDebug - If debug mode is enabled, prints messages to the debug area
+Parameters:
+    @debug_msg: The debug string to print}
+function PrintDebug
+    if ($debug_enabled = $TRUE)
+        add_text_line($debug_output, @debug_msg)
+    end if
+end function
+
+{Lock - Attempts to obtain a simple lock, and blocks the calling thread until the lock is obtained.
+Notes:
+    Recursive locks are safe, so a single thread can obtain the lock multiple times before unlocking.}
+function Lock
+    if ($lock_owner_ID # $NI_CALLBACK_ID) {If this thread isn't the owner of the lock, wait until the lock's owner releases it}
+        while ($lock > 0)
+            wait(100) {wait for 100 microseconds and try again. Hate to use a wait but what can you do...}
+        end while
+        inc($lock)
+        $lock_owner_ID := $NI_CALLBACK_ID {This thread now owns the lock}
+    end if    
+end function
+
+{Unlock - Releases the lock so that another thread may obtain it.}
+function Unlock
+    if ($lock > 0)
+        dec($lock)
+        if ($lock = 0)
+            $lock_owner_ID := -1 {nobody owns the lock}
+        end if
+    end if
+end function
+
+
+{Reset - Resets the state of the sript. Note-offs are sent to all voices, and the GUI is updated.}
+function Reset
+    call Lock()
+    {Send Note-Off to all voices, clear data strictures, and update GUI}
+    $i := 0
+    while ($i < num_elements(%voices))
+        if (%voices[$i] # -1)
+            set_midi($i + (16 * ($out_port - 1)), $MIDI_COMMAND_NOTE_OFF, %voices[$i], 0)
+            set_control_par_str(%voiceboxIDs[$i], $CONTROL_PAR_TEXT, "" & $i + 1 & ": ")
+            %voices[$i] := -1
+        end if
+        inc($i)
+    end while
+
+    $i := 0
+    while ($i < num_elements(%held_notes))
+        %held_notes[$i] := -1
+        inc($i)
+    end while
+    $held_notes_count := 0
+
+    @debug_msg := "MIDI reset on port " & !port_letters[$out_port - 1]
+    call PrintDebug()
+    call Unlock()
+end function
+
+{GetMostRecentHeldNote - Determines the note number of the note that was most recently pressed
+Return Value:
+    $r0: The note number of the note that was most recently pressed}
+function GetMostRecentHeldNote
+    $i := 0
+    $r0 := -1
+    $time_compare := -1
+    while ($i < num_elements(%held_notes))
+        if (%held_notes[$i] > $time_compare) {The most recent note will have the highest timestamp}
+            $r0 := $i
+            $time_compare := %held_notes[$i]
+        end if
+        inc($i)
+    end while
+    message("newest: " & $r0)
+end function
+
+{GetOldestHeldNote - Determines the note number of the earliest note that was pressed
+Return Value:
+    $r0: The note number of the earliest note that was pressed}
+function GetOldestHeldNote
+    
+    if ($held_notes_count = 0) {if no held notes, return -1}
+        $r0 := -1
+        exit
+    end if
+
+    $i := 0
+    $r0 := -1
+    $time_compare := -1
+
+    {must find the first non-empty element so that comparisons can be made}
+    while (($i < num_elements(%held_notes)) and ($r0 = -1))
+        if (%held_notes[$i] > $time_compare) {The first non-emtpy element is found}
+            $r0 := $i
+            $time_compare := %held_notes[$i]
+        end if
+        inc($i)
+    end while
+
+    {now compare the first non-empty element to every other non-emtpy element}
+    while ($i < num_elements(%held_notes))
+        if ((%held_notes[$i] # -1) and (%held_notes[$i] < %held_notes[$i]))
+            $r0 := $i
+            %held_notes[$i] := %held_notes[$i]
+        end if
+        inc($i)
+    end while
+    message("oldest: " & $r0)
+end function
+
+{GetClosestHeldNote - Determines the note number of the held note that is closest to the given note
+Parameters:
+    $p0: the note number to search around
+Return value:
+    $r0: the note number of the closest held note, or -1 if there are no other notes.
+Notes:
+    Ihe the case of a tie, the lower note will be returned.}
+function GetClosestHeldNote
+    
+    if ($held_notes_count = 0) {if no held notes, return -1}
+        $r0 := -1
+        exit
+    end if
+
+    $n := -1 {index of upper neighbour}
+    $i := 1 {index offset}
+    while ((($p0 + $i) < num_elements(%held_notes)) and (%held_notes[$p0 + $i] = -1)) {search up for the nearest note}
+        inc($i)
+    end while
+
+    {$p0 + $i is either the next note up, or off the end of the array}
+    if (($p0 + $i) < num_elements(%held_notes))
+        $n := $p0 + $i {$n index of upper neighbour, or -1 if there is none}
+    end if
+
+    $i := 1
+    while ((($p0 - $i) >= 0) and (%held_notes[$p0 - $i] = -1)) {search down for the nearest note}
+        inc($i)
+    end while
+
+    {$p0 - $i is either the next note down, or -1 if there is none}
+
+    {If there is no upper neighbour and no lower neighbour, return the initial note (a single note's closest neighbour is itself)}
+    if (($n = -1) and ($p0 - $i = -1))
+        $r0 := $p0
+        exit
+    end if
+
+    {If there is only an upper neighbour, that's it}
+    if (($n # -1) and ($p0 - $i = -1))
+        $r0 := $n
+        exit
+    end if
+
+    {If there is only a lower neighbour, that's it}
+    if (($n = -1) and ($p0 - $i # -1))
+        $r0 := $p0 - $i
+        exit
+    end if
+
+    {IF there is an upper and a lower neighbour, return the closest (lower on a tie)}
+    if (($n # -1) and (($p0 - $i) # -1))
+        if (($n - $p0) < ($i))
+            $r0 := $n
+            exit
+        else
+            $r0 := $p0 - $i
+            exit
+        end if
+    end if
+
+end function
+
+{AddToInQueue: Adds a note on or note off to the in queue.
+Parameters:
+    $p0: Note type (on or off)
+    $p1: Note number
+    $p2: Velocity
+Notes:
+    Calls to AddToInQueue when the queue is full will have no effect.}
+function AddToInQueue
+    if ($in_queue_count = $IN_QUEUE_LENGTH)
+        exit
+    end if
+    {Each entry occupies $IN_QUEUE_ELEMENT_WIDTH adjecent array elements: [note type, note #, velocity]}
+    %in_queue[$in_queue_count * $IN_QUEUE_ELEMENT_WIDTH] := $p0
+    %in_queue[($in_queue_count * $IN_QUEUE_ELEMENT_WIDTH) + 1] := $p1
+    %in_queue[($in_queue_count * $IN_QUEUE_ELEMENT_WIDTH) + 2] := $p2
+    inc($in_queue_count)
+end function
+
+{ClearInQueue: Erases all items from the queue
+Note:
+    Erased items are set to -1. After calling this function, the queue should be consolidated by calling ConsolidateInQueue()
+}
+function ClearInQueue
+    $in_queue_count := 0
+    $i := 0
+    while ($i < num_elements(%in_queue))
+        %in_queue[$i] := -1
+        inc($i)
+    end while
+end function
+
+{ConsolidateInQueue: Moves all non-empty elements to the front of the queue}
+function ConsolidateInQueue
+    $i := 0 
+    while ($i < $IN_QUEUE_LENGTH)
+        if (%in_queue[$i * $IN_QUEUE_ELEMENT_WIDTH] = -1)
+            {Found an empty element. Find the next non-empty element, and move it here.}
+            $j := $i + 1
+            while (($j < $IN_QUEUE_LENGTH) and (%in_queue[$j * $IN_QUEUE_ELEMENT_WIDTH] = -1))
+                inc($j)
+            end while
+            if ($j >= $IN_QUEUE_LENGTH) {Reached the end of the array}
+                {The rest of the array is empty, our work here is done!}
+                {for some reason, if an if statement contains only an exit statement, the program blocks...}
+                inc($i)
+                exit
+            end if
+            {A non empty item has been found. Move it to the i'th position}
+            %in_queue[$i * $IN_QUEUE_ELEMENT_WIDTH] := %in_queue[$j * $IN_QUEUE_ELEMENT_WIDTH]
+            %in_queue[($i * $IN_QUEUE_ELEMENT_WIDTH) + 1] := %in_queue[($j * $IN_QUEUE_ELEMENT_WIDTH) + 1]
+            %in_queue[($i * $IN_QUEUE_ELEMENT_WIDTH) + 2] := %in_queue[($j * $IN_QUEUE_ELEMENT_WIDTH) + 2]
+            %in_queue[$j * $IN_QUEUE_ELEMENT_WIDTH] := -1
+            %in_queue[($j * $IN_QUEUE_ELEMENT_WIDTH) + 1] := -1
+            %in_queue[($j * $IN_QUEUE_ELEMENT_WIDTH) + 2] := -1        
+        end if
+        inc($i)
+    end while
+end function
+
+{RemoveCancelledNotesFromInQueue: Removes note-ons for which a corresponding note-off exists later in the queue
+Notes:
+    If a note-off is preceeded (not neccesserily directly) by a note-on (for the same note #), all preceeding note-ons as well as the note-off are removed.
+    If the user holds and releases a note within the buffer duration, it should be as if the note was never struck at all.
+}
+function RemoveCancelledNotesFromInQueue
+    $i := 0
+    $temp := $in_queue_count {keep a separate copy of the queue count; we'll be changing it as we iterate}
+    while ($i < $temp)
+        {If this is a note-off:}
+        if (%in_queue[$i * $IN_QUEUE_ELEMENT_WIDTH] = $MIDI_COMMAND_NOTE_OFF)
+            $removed := $FALSE
+            $j := 0
+            while ($j < $i) {remove all preceeding note-ons with the same note #}
+                if ((%in_queue[$j * $IN_QUEUE_ELEMENT_WIDTH] = $MIDI_COMMAND_NOTE_ON) and (%in_queue[($j * $IN_QUEUE_ELEMENT_WIDTH) + 1] = %in_queue[($i * $IN_QUEUE_ELEMENT_WIDTH) + 1]))
+                    %in_queue[$j * $IN_QUEUE_ELEMENT_WIDTH] := -1
+                    %in_queue[($j * $IN_QUEUE_ELEMENT_WIDTH) + 1] := -1
+                    %in_queue[($j * $IN_QUEUE_ELEMENT_WIDTH) + 2] := -1
+                    dec($in_queue_count)
+                    $removed := $TRUE
+                end if
+                inc($j)
+            end while
+            {If a preceeding note-on was removed, remove the note-off as well}
+            if ($removed = $TRUE)
+                %in_queue[$i * $IN_QUEUE_ELEMENT_WIDTH] := -1
+                %in_queue[($i * $IN_QUEUE_ELEMENT_WIDTH) + 1] := -1
+                %in_queue[($i * $IN_QUEUE_ELEMENT_WIDTH) + 2] := -1
+                dec($in_queue_count)
+            end if            
+        end if
+        inc($i)
+    end while
+
+    call ConsolidateInQueue()
+end function
+
+{InQueueContainsNoteOns: Determines if the in queue contains any note-on events.
+Return value:
+    $r0: $TRUE iff in_queue contains at least one note-on event (else $FALSE)
+}
+function InQueueContainsNoteOns
+    $i := 0
+    $r0 := $FALSE
+    while ($i < $in_queue_count)
+        if (%in_queue[$i * $IN_QUEUE_ELEMENT_WIDTH] = $MIDI_COMMAND_NOTE_ON)
+            $r0 := $TRUE
+            exit
+        end if
+        inc($i)
+    end while
+end function
+
+{UpdateHeldNotesFromQueue: Updates the held status of each note, storing the (Kontakt) time at which the note was held.
+Notes:
+    Release notes should be processed first to avoid an unneccessary voice steal.
+}
+function UpdateHeldNotesFromQueue
+    {First, go through the queue and process each released note.}
+    $i := 0
+    while ($i < $in_queue_count)
+        if ((%in_queue[$i * $IN_QUEUE_ELEMENT_WIDTH] = $MIDI_COMMAND_NOTE_OFF) and (%held_notes[%in_queue[($i * $IN_QUEUE_ELEMENT_WIDTH) + 1]] # -1)) {If this is a note off and this note is currently being held}
+            %held_notes[%in_queue[($i * $IN_QUEUE_ELEMENT_WIDTH) + 1]] := -1
+            dec($held_notes_count)
+        end if
+        inc($i)
+    end while
+
+    {Then process the new notes}
+    $i := 0
+    while ($i < $in_queue_count)
+        if (%in_queue[$i * $IN_QUEUE_ELEMENT_WIDTH] = $MIDI_COMMAND_NOTE_ON)
+            if ($held_notes_count >= $max_voices) {All voices are full! Need to steal a note}
+
+                $p0 := %in_queue[($i * $IN_QUEUE_ELEMENT_WIDTH) + 1] {parameter for Get___HeldNote()}
+                $temp := $i {our iterator is about to get hijaked, save a copy now}
+
+                {Check voice stealing mode}
+                select ($voice_stealing_mode)
+                    case $STEAL_NEWEST
+                        call GetMostRecentHeldNote() {$r0 = most recent note number}
+                    case $STEAL_OLDEST
+                        call GetOldestHeldNote() {$r0 = oldest note number}
+                    case $STEAL_CLOSEST
+                        call GetClosestHeldNote() {$r0 = closest note number}
+                end select
+
+                $i := $temp {restore iterator}
+
+                %held_notes[$r0] := -1 {release this note}
+                dec($held_notes_count)
+            end if
+
+            {Ignore note-ons for notes that are already held; only process new note-ons}
+            if (%held_notes[%in_queue[($i * $IN_QUEUE_ELEMENT_WIDTH) + 1]] = -1)
+                %held_notes[%in_queue[($i * $IN_QUEUE_ELEMENT_WIDTH) + 1]] := $ENGINE_UPTIME
+                inc($held_notes_count)
+            end if            
+
+        end if
+        inc($i)
+    end while
+
+    {debug}
+    @debug_msg := "Notes (" & $held_notes_count & "): ["
+    $i := 0
+    while ($i < num_elements(%held_notes))
+        if (%held_notes[$i] # -1)
+            @debug_msg := @debug_msg & $i & ","
+        end if
+        inc($i)
+    end while
+    @debug_msg := @debug_msg & "]"
+    call PrintDebug()
+
+end function
+
+{SetHeldNotesIteratorToFront - Sets the iterator for the held notes list to the beginning of the list}
+function SetHeldNotesIteratorToFront
+    $held_notes_iterator := 0
+end function
+
+{SetHeldNotesIteratorToFront - Sets the iterator for the held notes list to the end of the list}
+function SetHeldNotesIteratorToEnd
+    $held_notes_iterator := num_elements(%held_notes) - 1
+end function
+
+{GetNextHeldNoteAsc - Finds the next highest held note in the held notes list
+Return value:
+    $r0: The note number of the next highest held note
+Notes:
+    Successive calls to this function will return the held note numbers in ascending order. The iterator will wrap.}
+function GetNextHeldNoteAsc
+    if ($held_notes_count = 0) {if no held notes, return -1}
+        $r0 := -1
+        exit
+    end if
+
+    while (%held_notes[$held_notes_iterator] = -1)
+        inc($held_notes_iterator)
+        if ($held_notes_iterator >= num_elements(%held_notes))
+            call SetHeldNotesIteratorToFront() {wrap}
+        end if
+    end while
+
+    $r0 := $held_notes_iterator {the index is the note #}
+    
+    inc($held_notes_iterator)
+    if ($held_notes_iterator >= num_elements(%held_notes)) {wrap}
+        call SetHeldNotesIteratorToFront()
+    end if
+end function
+
+{GetNextHeldNoteAsc - Finds the next lowest held note in the held notes list
+Return value:
+    $r0: The note number of the next lowest held note
+Notes:
+    Successive calls to this function will return the held note numbers in descending order}
+function GetNextHeldNoteDesc
+    if ($held_notes_count = 0) {if no held notes, return -1}
+        $r0 := -1
+        exit
+    end if
+
+    while (%held_notes[$held_notes_iterator] = -1)
+        dec($held_notes_iterator)
+        if ($held_notes_iterator < 0)
+            call SetHeldNotesIteratorToEnd() {wrap}
+        end if
+    end while
+
+    $r0 := $held_notes_iterator {the index is the note #}
+    
+    dec($held_notes_iterator)
+    if ($held_notes_iterator < 0)
+        call SetHeldNotesIteratorToEnd() {wrap}
+    end if
+end function
+
+{DistributeNotesToVoices - Examines and sets up the correct voicing given the currently held notes
+Notes:
+    After calling this function, %temp_voices will contain the new notes/voice assignments. No MIDI commands will be sent.
+}
+function DistributeNotesToVoices
+
+    {clear %temp_voices}
+    $i := 0
+    while ($i < num_elements(%temp_voices))
+        %temp_voices[$i] := -1
+        inc($i)
+    end while
+
+    
+
+    call SetHeldNotesIteratorToFront()
+    {$max_voices / $held_notes_count is the minimum number of times each note will be played, so copy the notes into the voices that many times}
+   
+    $i := 0
+    while ($i < (($max_voices / $held_notes_count) * $held_notes_count)) {Iterate through the held notes the minimum # of times}
+        call GetNextHeldNoteAsc() {$r0 = next held note #}
+        %temp_voices[$i] := $r0
+        inc($i)
+    end while
+
+    {Check note doubling preference to fill in remaining voices}
+    select ($note_doubling_mode)
+        case $PREFER_LOWER
+            call SetHeldNotesIteratorToFront()
+            while ($i < $max_voices)
+                call GetNextHeldNoteAsc() 
+                %temp_voices[$i] := $r0
+                inc($i)
+            end while
+        case $PREFER_HIGHER
+            call SetHeldNotesIteratorToEnd()
+            while ($i < $max_voices)
+                call GetNextHeldNoteDesc() 
+                %temp_voices[$i] := $r0
+                inc($i)
+            end while
+    end select    
+
+   {Sort descending so that low instruments on high midi channels play low notes.}
+   sort(%temp_voices, 1) {1 = sort descending}
+end function
+
+{KillReleasedNotes: queues a note-off for any voice that is playing a note that is no longer held.
+Notes:
+    After calling this function, %temp_voices will contain the new notes/voice assignments. No MIDI commands will be sent.
+}
+function KillReleasedNotes
+    {Iterate through the current voice assignments, and copy them to temp voices. Skip notes that are no longer held.}
+    $i := 0
+    while ($i < $max_voices)
+        if ((%voices[$i] # -1) and (%held_notes[%voices[$i]] # -1))
+            %temp_voices[$i] := %voices[$i]
+        else
+            %temp_voices[$i] := -1
+        end if
+        inc($i)
+    end while
+end function
+
+{SendMIDICommands - Send appropriate note ons/offs according to the current voicing}
+function SendMIDICommands
+    $i := 0   
+    while ($i < $max_voices) {Process each voice}
+
+    	@debug_msg := "%temp_voices[$i] " & %temp_voices[$i]
+        call PrintDebug()    
+
+        if (%temp_voices[$i] # %voices[$i]) {Skip this voice if it's being told to play the note it's already playing}
+
+            if ((%temp_voices[$i] = -1) and (%voices[$i] # -1)) {If the new assignment is no note, just send a note-off}
+                set_midi($i + (16 * ($out_port - 1)), $MIDI_COMMAND_NOTE_OFF, %voices[$i], 127)
+                %voices[$i] := -1 {this voice is now free}
+                set_control_par_str(%voiceboxIDs[$i], $CONTROL_PAR_TEXT, "" & $i + 1 & ": ")
+                @debug_msg := "Note off - channel: " & $i + (16 * ($out_port - 1)) & " note: " & %voices[$i]
+                call PrintDebug()          
+
+            else 
+                if(%temp_voices[$i] # -1) {Process a note-on}
+                    {Note-ons should be processed before note-offs to enable legato transitions}
+                    {Always send note-ons with using the velocity of the most recently played note, or else note-ons that occur
+                    as a result of re-voicings could create jarring/unwanted velocities.}
+                    set_midi($i + (16 * ($out_port - 1)), $MIDI_COMMAND_NOTE_ON, %temp_voices[$i], $most_recent_velocity)
+                    set_control_par_str(%voiceboxIDs[$i], $CONTROL_PAR_TEXT, "" & $i + 1 & ": " & !note_names[%temp_voices[$i]])
+                    @debug_msg := "Note on - channel: " & $i + (16 * ($out_port - 1)) & " note: " & %temp_voices[$i] & " vel: " & $most_recent_velocity            
+                    call PrintDebug()
+                    
+                    if (%voices[$i] # -1) {Don't forget to send a note-off for the note this voice was previously playing}
+                        set_midi($i + (16 * ($out_port - 1)), $MIDI_COMMAND_NOTE_OFF, %voices[$i], 127)
+                        @debug_msg := "Note off - channel: " & $i + (16 * ($out_port - 1)) & " note: " & %voices[$i]            
+                        call PrintDebug()
+                    end if
+
+                    %voices[$i] := %temp_voices[$i] {this voice is now assigned the new note}
+                end if
+            end if            
+        end if
+        inc($i)
+
+    end while
+end function
+
+{****************on midi_in****************}
+on midi_in
+    {Only listen on the right port}
+    if (($MIDI_CHANNEL < (($in_port - 1) * 16)) or ($MIDI_CHANNEL >= ($in_port * 16)))
+        ignore_midi
+        exit
+    end if
+
+    {If this event is a note on or note off inside the divisi area, process divisi.}
+    if ((($MIDI_COMMAND = $MIDI_COMMAND_NOTE_ON) or ($MIDI_COMMAND = $MIDI_COMMAND_NOTE_OFF)) and (($MIDI_BYTE_1 >= $low_limit) and ($MIDI_BYTE_1 <= $high_limit)))
+
+        {Critical section: acquire lock}
+        call Lock()
+
+        {We'll handle the MIDI command from here}
+        ignore_midi
+
+        {If this a note-on, store the velocity.}
+        if (($MIDI_COMMAND = $MIDI_COMMAND_NOTE_ON) and ($MIDI_BYTE_2 > 0))
+            $most_recent_velocity := $MIDI_BYTE_2
+
+            {If mono mode is active, create note offs for all current notes}
+            if (($mono_enabled = $TRUE) and ($current_mono_cc_val >= $mono_threshold))
+            	$i := 0
+	            while ($i < $max_voices)
+        			if (%voices[$i] # -1)
+		        		$p0 := $MIDI_COMMAND_NOTE_OFF
+			            $p1 := %voices[$i]
+				        $p2 := 0
+				        call AddToInQueue()
+				    end if
+			        inc($i)
+	        	end while
+			end if
+
+	        $most_recent_note := $MIDI_BYTE_1
+        end if
+
+        {Add note event to the queue}
+        $p0 := $MIDI_COMMAND
+        if (($MIDI_COMMAND = $MIDI_COMMAND_NOTE_ON) and ($MIDI_BYTE_2 = 0))
+            $p0 := $MIDI_COMMAND_NOTE_OFF {Keep things consistent}
+        end if
+        $p1 := $MIDI_BYTE_1
+        $p2 := $MIDI_BYTE_2
+        call AddToInQueue()
+
+        {If buffer is active, release lock and exit function}
+        if ($buffer_active = $TRUE)
+            call Unlock()
+            exit
+        end if        
+
+        {Else (if buffer is not active), release lock and start buffering}
+        $buffer_active := $TRUE
+        call Unlock()
+
+        {Only wait if the buffer isn't disabled, and mono mode is off}
+        if (($buffer_length_ms > 0) and (($mono_enabled = $FALSE) or ($current_mono_cc_val < $mono_threshold)))
+            wait($buffer_length_ms * 1000) {convert ms to microseconds}
+        end if
+        
+        if ($debug_auto_clear = $TRUE)
+            set_text($debug_output, "")
+        end if
+
+        {Once buffer has elapsed, acquire lock and remove cancelled notes from the queue (note-ons for which a corresponding note-off exists)}
+        call Lock()
+        $buffer_active := $FALSE        
+        call RemoveCancelledNotesFromInQueue()
+
+        {Go through the queue, adding new notes to the held notes list and removing the released notes}
+        call UpdateHeldNotesFromQueue()
+
+        call InQueueContainsNoteOns()
+        if ($r0 = $FALSE) {If the queue only contains note-offs, don't redistribute notes. Just kill the appropriate voices.}
+            call KillReleasedNotes()    
+        else {Else, if the buffer contains at least one note-on, re-distribute the voices}
+            call DistributeNotesToVoices()
+        end if
+
+        {Send MIDI commands for new note-ons and/or note-offs}
+        call SendMIDICommands()
+
+        {Clear the queue}
+        call ClearInQueue()
+
+        {Release Lock}
+        call Unlock()
+    else
+
+		{This is the Mono cc.}
+    	if (($MIDI_COMMAND = $MIDI_COMMAND_CC) and ($MIDI_BYTE_1 = $mono_cc))
+    		$current_mono_cc_val := $MIDI_BYTE_2 {Store the value to later compare against the threshold.}
+    	end if
+
+        {This is a note on or off outside the divisi area}        
+        if (($MIDI_COMMAND = $MIDI_COMMAND_NOTE_ON) or ($MIDI_COMMAND = $MIDI_COMMAND_NOTE_OFF))
+            if ($debug_auto_clear = $TRUE)
+                set_text($debug_output, "")
+            end if
+            @debug_msg := "Note " & $MIDI_BYTE_1 & " outside divisi range."
+            call PrintDebug()
+        end if
+
+        {This is everything else}
+        if (($mono_passthrough = $FALSE) and ($MIDI_COMMAND = $MIDI_COMMAND_CC) and ($MIDI_BYTE_1 = $mono_cc))
+			ignore_midi {Ignore the MIDI command if not passing through to instruments}
+		else
+	        $i := 0
+	        while ($i < $max_voices)
+	            set_midi($i + (16 * ($out_port - 1)), $MIDI_COMMAND, $MIDI_BYTE_1, $MIDI_BYTE_2)
+	            inc($i)
+	        end while
+	    end if
+    end if
+end on
+
+{****************Control Handlers****************}
+
+{$mono_enabled - forces all voices to play the same note, as along as a certain CC is above a specific threshold}
+on ui_control($mono_enabled)
+	if ($mono_enabled = $TRUE)
+		set_text($mono_enabled, "Unison")
+    	set_control_par(get_ui_id($mono_enabled), $CONTROL_PAR_WIDTH, 40)
+		set_control_par(get_ui_id($mono_passthrough), $CONTROL_PAR_HIDE, $HIDE_PART_NOTHING)
+		set_control_par(get_ui_id($mono_cc), $CONTROL_PAR_HIDE, $HIDE_PART_NOTHING)
+		set_control_par(get_ui_id($mono_threshold), $CONTROL_PAR_HIDE, $HIDE_PART_NOTHING)
+	else
+		set_text($mono_enabled, "Unison (off)")
+		set_control_par(get_ui_id($mono_enabled), $CONTROL_PAR_WIDTH, 88)
+		set_control_par(get_ui_id($mono_passthrough), $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+		set_control_par(get_ui_id($mono_cc), $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+		set_control_par(get_ui_id($mono_threshold), $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+    end if
+end on
+
+{$debug_enabled - Toggles the visible state of the debug output and turns on/off debug messages.}
+on ui_control($debug_enabled)
+    if ($debug_enabled = $TRUE)
+        set_control_par(get_ui_id($debug_auto_clear), $CONTROL_PAR_HIDE, $HIDE_PART_NOTHING)
+        set_control_par(get_ui_id($debug_clear), $CONTROL_PAR_HIDE, $HIDE_PART_NOTHING)
+        set_control_par(get_ui_id($debug_output), $CONTROL_PAR_HIDE, $HIDE_PART_NOTHING)
+    else
+        set_control_par(get_ui_id($debug_auto_clear), $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+        set_control_par(get_ui_id($debug_clear), $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+        set_control_par(get_ui_id($debug_output), $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+    end if
+end on
+
+{$debug_clear - clears all text from the debug window.}
+on ui_control($debug_clear)
+    if ($debug_clear = $TRUE)
+        $debug_clear := $FALSE
+    end if
+    set_text($debug_output, "")
+end on
+
+{$max_voices - Updates the number of voices that notes will be distributed to.}
+on ui_control($max_voices)
+    call Reset()
+    $control_index := 0
+    while ($control_index < $MAX_POLY)
+        if ($control_index < $max_voices)
+            set_control_par(%voiceboxIDs[$control_index], $CONTROL_PAR_HIDE, $HIDE_PART_NOTHING)
+        else
+            set_control_par(%voiceboxIDs[$control_index], $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+        end if
+        inc($control_index)
+    end while
+end on
+
+{$in_port - Defines the port number (0 - 63) that the script will listen on.}
+on ui_control($in_port)
+    set_knob_label($in_port, !port_letters[$in_port - 1])
+end on
+
+{$out_port - Defines the port number (0-63) that the script will send MIDI messags to.}
+on ui_control($out_port)
+    set_knob_label($out_port, !port_letters[$out_port - 1])
+end on
+
+{$buffer_length_ms - The length (in ms) of the input buffer. 0 = disabled (all MIDI events are processed in series.)}
+on ui_control($buffer_length_ms)
+    if ($buffer_length_ms = 0)
+        set_control_par_str(get_ui_id($buffer_length_ms), $CONTROL_PAR_LABEL, "Off")
+    else
+        set_control_par_str(get_ui_id($buffer_length_ms), $CONTROL_PAR_LABEL, $buffer_length_ms)
+    end if
+end on
+
+{$low_limit: Must always be lower than or equal to $high_limit}
+on ui_control($low_limit)
+    if ($low_limit > $high_limit)
+        $Low_limit := $high_limit
+    end if
+end on
+
+{$high_limit: Must always be lower than or equal to $low_limit}
+on ui_control($high_limit)
+    if ($high_limit < $Low_limit)
+        $high_limit := $low_limit
+    end if
+end on

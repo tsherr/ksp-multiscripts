@@ -1,0 +1,377 @@
+{CC to Keyswitch - responds to MIDI CC data and generates notes depending on the value of the CC.}
+{Author: Toby Sherriff - www.tobysherriff.net}
+{Version History:
+	1.2 - Added control help and status area
+    1.1 - Updated note boxes to use note names
+    1.0 - Initial implementation}
+
+{ #pragma save_compiled_source cc_to_keyswitch_v1.2_compiled.txt }
+
+on init
+
+	declare @VERSION_NUMBER
+	@VERSION_NUMBER := "1.2"
+
+    {**********Globals and constants**********}
+    declare const $TRUE := 1
+    declare const $FALSE := 0
+    declare const $DEBUG := $TRUE
+    declare const $MAX_DIVISIONS := 16
+    declare $current_division := -1 {no CC data received yet}            
+
+    {**********"Stack" variables**********} 
+    declare $division_to_check := 0
+    declare $index := 0    
+
+    {**********Parameters and return values for user functions**********}
+    declare $param_CC_val_to_check
+    declare $ret_division_num        
+
+    {**********UI Setup**********}
+    message("") {Clear status line}
+    set_script_title("CC -> Keyswitch") 
+    set_ui_height_px(150)     
+
+    {The MIDI channel to listen on (channels begin at 0, so display is offset by 1)}
+    declare ui_value_edit $channel_to_monitor (1, 16, 1)
+    $channel_to_monitor := 1 {default to 1}
+    set_text($channel_to_monitor, "Monitor MIDI Channel")
+    move_control($channel_to_monitor, 2, 1)
+    set_control_par (get_ui_id($channel_to_monitor), $CONTROL_PAR_WIDTH, 140)
+    make_persistent($channel_to_monitor)
+    set_control_help($channel_to_monitor, "Select the MIDI channel to monitor for incoming CC data.")
+
+    {The CC# to respond to}
+    declare ui_value_edit $cc_to_monitor(0, 127, 1)
+    $cc_to_monitor := 1 {default to MOD}
+    set_text($cc_to_monitor, "Incoming CC")
+    move_control($cc_to_monitor, 2, 2)
+    set_control_par (get_ui_id($cc_to_monitor), $CONTROL_PAR_WIDTH, 140)
+    make_persistent($cc_to_monitor)
+    set_control_help($cc_to_monitor, "Select the CC # to monitor for incoming data.")
+
+    {The number of ranges within the CC value from which notes will be triggered (number of notes that can be triggered)
+    {Note: If this division creates a fractional number, the division will occur on the floor of the fraction.}
+    declare ui_value_edit $num_of_cc_divisions(1, $MAX_DIVISIONS, 1)
+    $num_of_cc_divisions := 4 {default to 4}
+    set_text($num_of_cc_divisions, "Number of CC Divisions")
+    move_control($num_of_cc_divisions, 2, 3)
+    set_control_par(get_ui_id($num_of_cc_divisions), $CONTROL_PAR_WIDTH, 140)
+    make_persistent($num_of_cc_divisions)
+    set_control_help($num_of_cc_divisions, "Sets the number of divisions (notes) into which the the CC data will be divided (or, the number of notes to produce).")
+
+    {Should the monitored CC data be passed through to the instrument? 1/0 = true/false}
+    declare ui_switch $cc_passthrough
+    $cc_passthrough := $FALSE
+    set_text($cc_passthrough, "Pass CC Data Through")
+    move_control($cc_passthrough, 4, 1)
+    set_control_par(get_ui_id($cc_passthrough), $CONTROL_PAR_WIDTH, 125)
+    make_persistent($cc_passthrough)
+    set_control_help($cc_passthrough, "Enable to allow the monitored CC values to pass through to the instrument(s).")
+
+    {Prevent redundant notes from firing as a result of small changes in CC data}
+    declare ui_switch $filter_redundant_data
+    $filter_redundant_data := $TRUE
+    set_text($filter_redundant_data, "Prevent Redundant Notes")
+    move_control($filter_redundant_data, 4, 2)
+    set_control_par(get_ui_id($filter_redundant_data), $CONTROL_PAR_WIDTH, 125)
+    make_persistent($filter_redundant_data)
+    set_control_help($filter_redundant_data, "Enable to prevent triggering the same keyswitch multiple times in a row.")
+
+    {Status message area}
+    declare ui_label $status(2, 2)
+    move_control_px($status, 440, 0)
+    set_control_par(get_ui_id($status), $CONTROL_PAR_WIDTH, 152)
+    set_control_par(get_ui_id($status), $CONTROL_PAR_HEIGHT, 60)
+    set_text($status, "Waiting for data...")
+    set_control_help($status, "Shows information about the most recently triggered keyswitch.")
+
+    {Script info}
+    declare ui_label $title(1, 1)
+    set_text($title, "CC to Keyswitch")
+    move_control_px($title, 0, 40)
+    hide_part($title, $HIDE_PART_BG)
+    set_control_par(get_ui_id($title), $CONTROL_PAR_WIDTH, 80)
+    set_control_par(get_ui_id($title), $CONTROL_PAR_HEIGHT, 18)
+    set_control_par(get_ui_id($title), $CONTROL_PAR_FONT_TYPE, 12)
+	declare ui_label $about(1, 1)
+    set_text($about, "tobysherriff.net")
+    move_control_px($about, 0, 55)
+    hide_part($about, $HIDE_PART_BG)
+    set_control_par(get_ui_id($about), $CONTROL_PAR_WIDTH, 80)
+    set_control_par(get_ui_id($about), $CONTROL_PAR_HEIGHT, 18)
+    set_control_par(get_ui_id($about), $CONTROL_PAR_FONT_TYPE, 12)
+    declare ui_label $version(1, 1)
+    set_text($version, "             v" & @VERSION_NUMBER)
+    move_control_px($version, 0, 70)
+    hide_part($version, $HIDE_PART_BG)
+    set_control_par(get_ui_id($version), $CONTROL_PAR_WIDTH, 80)
+    set_control_par(get_ui_id($version), $CONTROL_PAR_HEIGHT, 18)
+    set_control_par(get_ui_id($version), $CONTROL_PAR_FONT_TYPE, 12)
+
+    {Value boxes for the notes that will be triggered}
+    declare ui_label $notes_label(1, 1)
+    declare ui_value_edit $notebox0(0, 127, $VALUE_EDIT_MODE_NOTE_NAMES)
+    declare ui_value_edit $notebox1(0, 127, $VALUE_EDIT_MODE_NOTE_NAMES)
+    declare ui_value_edit $notebox2(0, 127, $VALUE_EDIT_MODE_NOTE_NAMES)
+    declare ui_value_edit $notebox3(0, 127, $VALUE_EDIT_MODE_NOTE_NAMES)
+    declare ui_value_edit $notebox4(0, 127, $VALUE_EDIT_MODE_NOTE_NAMES)
+    declare ui_value_edit $notebox5(0, 127, $VALUE_EDIT_MODE_NOTE_NAMES)
+    declare ui_value_edit $notebox6(0, 127, $VALUE_EDIT_MODE_NOTE_NAMES)
+    declare ui_value_edit $notebox7(0, 127, $VALUE_EDIT_MODE_NOTE_NAMES)
+    declare ui_value_edit $notebox8(0, 127, $VALUE_EDIT_MODE_NOTE_NAMES)
+    declare ui_value_edit $notebox9(0, 127, $VALUE_EDIT_MODE_NOTE_NAMES)
+    declare ui_value_edit $notebox10(0, 127, $VALUE_EDIT_MODE_NOTE_NAMES)
+    declare ui_value_edit $notebox11(0, 127, $VALUE_EDIT_MODE_NOTE_NAMES)
+    declare ui_value_edit $notebox12(0, 127, $VALUE_EDIT_MODE_NOTE_NAMES)
+    declare ui_value_edit $notebox13(0, 127, $VALUE_EDIT_MODE_NOTE_NAMES)
+    declare ui_value_edit $notebox14(0, 127, $VALUE_EDIT_MODE_NOTE_NAMES)
+    declare ui_value_edit $notebox15(0, 127, $VALUE_EDIT_MODE_NOTE_NAMES)
+    set_control_help($notebox0, "Determines the note that will be triggered by division 1.")
+    set_control_help($notebox1, "Determines the note that will be triggered by division 2.")
+    set_control_help($notebox2, "Determines the note that will be triggered by division 3.")
+    set_control_help($notebox3, "Determines the note that will be triggered by division 4.")
+    set_control_help($notebox4, "Determines the note that will be triggered by division 5.")
+    set_control_help($notebox5, "Determines the note that will be triggered by division 6.")
+    set_control_help($notebox6, "Determines the note that will be triggered by division 7.")
+    set_control_help($notebox7, "Determines the note that will be triggered by division 8.")
+    set_control_help($notebox8, "Determines the note that will be triggered by division 9.")
+    set_control_help($notebox9, "Determines the note that will be triggered by division 10.")
+    set_control_help($notebox10, "Determines the note that will be triggered by division 11.")
+    set_control_help($notebox11, "Determines the note that will be triggered by division 12.")
+    set_control_help($notebox12, "Determines the note that will be triggered by division 13.")
+    set_control_help($notebox13, "Determines the note that will be triggered by division 14.")
+    set_control_help($notebox14, "Determines the note that will be triggered by division 15.")
+    set_control_help($notebox15, "Determines the note that will be triggered by division 16.")
+    $notebox0 := 12
+    $notebox1 := 13
+    $notebox2 := 14
+    $notebox3 := 15
+    $notebox4 := 16
+    $notebox5 := 17
+    $notebox6 := 18
+    $notebox7 := 19
+    $notebox8 := 20
+    $notebox9 := 21
+    $notebox10 := 22
+    $notebox11 := 23
+    $notebox12 := 24
+    $notebox13 := 25
+    $notebox14 := 26
+    $notebox15 := 27
+    set_text($notes_label, "Notes to trigger (from low CC values to high CC values):")
+    set_text($notebox0, "1")
+    set_text($notebox1, "2")
+    set_text($notebox2, "3")
+    set_text($notebox3, "4")
+    set_text($notebox4, "5")
+    set_text($notebox5, "6")
+    set_text($notebox6, "7")
+    set_text($notebox7, "8")
+    set_text($notebox8, "9")
+    set_text($notebox9, "10")
+    set_text($notebox10, "11")
+    set_text($notebox11, "12")
+    set_text($notebox12, "13")
+    set_text($notebox13, "14")
+    set_text($notebox14, "15")
+    set_text($notebox15, "16")
+    move_control($notes_label, 1, 4)
+    move_control($notebox0, 2, 5)
+    move_control($notebox1, 2, 5)
+    move_control($notebox2, 2, 5)
+    move_control($notebox3, 2, 5)
+    move_control($notebox4, 2, 5)
+    move_control($notebox5, 2, 5)
+    move_control($notebox6, 2, 5)
+    move_control($notebox7, 2, 5)
+    move_control($notebox8, 2, 6)
+    move_control($notebox9, 2, 6)
+    move_control($notebox10, 2, 6)
+    move_control($notebox11, 2, 6)
+    move_control($notebox12, 2, 6)
+    move_control($notebox13, 2, 6)
+    move_control($notebox14, 2, 6)
+    move_control($notebox15, 2, 6)
+    set_control_par(get_ui_id($notes_label), $CONTROL_PAR_WIDTH, 500)
+    set_control_par(get_ui_id($notes_label), $CONTROL_PAR_HEIGHT, 75)
+    set_control_par(get_ui_id($notebox0), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($notebox1), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($notebox2), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($notebox3), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($notebox4), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($notebox5), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($notebox6), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($notebox7), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($notebox8), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($notebox9), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($notebox10), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($notebox11), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($notebox12), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($notebox13), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($notebox14), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($notebox15), $CONTROL_PAR_WIDTH, 55)
+    set_control_par(get_ui_id($notes_label), $CONTROL_PAR_POS_X, 92)
+    set_control_par(get_ui_id($notebox0), $CONTROL_PAR_POS_X, 100)
+    set_control_par(get_ui_id($notebox1), $CONTROL_PAR_POS_X, 160)
+    set_control_par(get_ui_id($notebox2), $CONTROL_PAR_POS_X, 220)
+    set_control_par(get_ui_id($notebox3), $CONTROL_PAR_POS_X, 280)
+    set_control_par(get_ui_id($notebox4), $CONTROL_PAR_POS_X, 340)
+    set_control_par(get_ui_id($notebox5), $CONTROL_PAR_POS_X, 400)
+    set_control_par(get_ui_id($notebox6), $CONTROL_PAR_POS_X, 460)
+    set_control_par(get_ui_id($notebox7), $CONTROL_PAR_POS_X, 520)
+    set_control_par(get_ui_id($notebox8), $CONTROL_PAR_POS_X, 100)
+    set_control_par(get_ui_id($notebox9), $CONTROL_PAR_POS_X, 160)
+    set_control_par(get_ui_id($notebox10), $CONTROL_PAR_POS_X, 220)
+    set_control_par(get_ui_id($notebox11), $CONTROL_PAR_POS_X, 280)
+    set_control_par(get_ui_id($notebox12), $CONTROL_PAR_POS_X, 340)
+    set_control_par(get_ui_id($notebox13), $CONTROL_PAR_POS_X, 400)
+    set_control_par(get_ui_id($notebox14), $CONTROL_PAR_POS_X, 460)
+    set_control_par(get_ui_id($notebox15), $CONTROL_PAR_POS_X, 520)
+    make_persistent($notes_label)
+    make_persistent($notebox0)
+    make_persistent($notebox1)
+    make_persistent($notebox2)
+    make_persistent($notebox3)
+    make_persistent($notebox4)
+    make_persistent($notebox5)
+    make_persistent($notebox6)
+    make_persistent($notebox7)
+    make_persistent($notebox8)
+    make_persistent($notebox9)
+    make_persistent($notebox10)
+    make_persistent($notebox11)
+    make_persistent($notebox12)
+    make_persistent($notebox13)
+    make_persistent($notebox14)
+    make_persistent($notebox15)
+
+    {store the notebox UI IDs so hiding/showing them can be more effecient}
+    declare %notebox_IDs[16]
+    %notebox_IDs[0] := get_ui_id($notebox0)
+    %notebox_IDs[1] := get_ui_id($notebox1)
+    %notebox_IDs[2] := get_ui_id($notebox2)
+    %notebox_IDs[3] := get_ui_id($notebox3)
+    %notebox_IDs[4] := get_ui_id($notebox4)
+    %notebox_IDs[5] := get_ui_id($notebox5)
+    %notebox_IDs[6] := get_ui_id($notebox6)
+    %notebox_IDs[7] := get_ui_id($notebox7)
+    %notebox_IDs[8] := get_ui_id($notebox8)
+    %notebox_IDs[9] := get_ui_id($notebox9)
+    %notebox_IDs[10] := get_ui_id($notebox10)
+    %notebox_IDs[11] := get_ui_id($notebox11)
+    %notebox_IDs[12] := get_ui_id($notebox12)
+    %notebox_IDs[13] := get_ui_id($notebox13)
+    %notebox_IDs[14] := get_ui_id($notebox14)
+    %notebox_IDs[15] := get_ui_id($notebox15)
+   
+    {We need to make sure the appropriate boxes are shown/hidden, but since we can't call a function in on init
+    we have to duplicate some code...}
+    read_persistent_var($num_of_cc_divisions)
+    $index := 0
+
+    while ($index < $MAX_DIVISIONS)
+        if ($num_of_cc_divisions > $index)
+            set_control_par(%notebox_IDs[$index], $CONTROL_PAR_HIDE, $HIDE_PART_NOTHING)
+        else
+            set_control_par(%notebox_IDs[$index], $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+        end if
+        inc($index)
+    end while   
+
+end on
+
+{**********User Functions**********}
+{Given a CC value, determine in which division of the CC values (0-127) it lies. Divisions are numbered 0 to n, from low CC values to high.
+$param_CC_val_to_check: The CC value to check
+$ret_division_num: The division in which the value lies, beginning at 0 (-1 indicates the CC value is out of range).}
+
+function get_division_num_from_cc_value
+    {validate parameters}
+    if (not(in_range($param_CC_val_to_check, 0, 127)))
+        $ret_division_num := -1 {CC value out of range!}
+        exit
+    end if
+
+    {iterate through the CC divisions to find which one this cc value lies in}
+    $division_to_check := 0  
+    while ($division_to_check < $num_of_cc_divisions)
+        if ($param_CC_val_to_check < (($division_to_check + 1) * 128) / $num_of_cc_divisions) {must be done this way to avoid compounded loss of precsision (int math)}
+            $ret_division_num := $division_to_check
+            exit
+        end if
+        inc($division_to_check)
+    end while    
+
+    {If we get here, something went horrible wrong...}
+    if ($DEBUG = $TRUE)
+        message("CRITICAL ERROR: Division not found! $param_CC_val_to_check: " & $param_CC_val_to_check & " $num_of_cc_divisions: " & $num_of_cc_divisions)
+    end if
+
+    $ret_division_num := -1
+    exit    
+
+end function
+
+{Hides or shows the note boxes depending on the number of CC divisions}
+{No parameters or return value}
+function display_note_boxes
+
+    {Only show as many note boxes as there are CC divisions}
+    $index := 0
+    while ($index < $MAX_DIVISIONS)
+        if ($num_of_cc_divisions > $index)
+            set_control_par(%notebox_IDs[$index], $CONTROL_PAR_HIDE, $HIDE_PART_NOTHING)
+        else
+            set_control_par(%notebox_IDs[$index], $CONTROL_PAR_HIDE, $HIDE_WHOLE_CONTROL)
+        end if
+        inc($index)
+    end while    
+
+end function
+
+{**********midi_in**********}
+on midi_in   
+
+    {Is this CC information?}
+    if ($MIDI_COMMAND # $MIDI_COMMAND_CC)
+        exit
+    end if       
+
+    {This is not the CC/channel you're looking for...}
+    if (($MIDI_BYTE_1 # $cc_to_monitor) or ($MIDI_CHANNEL # $channel_to_monitor - 1)) {channels offset by 1 for display}
+        exit
+    end if    
+
+    {Inspect the value of this CC. To which division does it belong?}
+    $param_CC_val_to_check := $MIDI_BYTE_2
+    call get_division_num_from_cc_value      
+
+    {Should we avoid firing redundant notes?}
+    if (($ret_division_num # $current_division) or ($filter_redundant_data = $FALSE))
+        $current_division := $ret_division_num
+        if ($current_division < num_elements(%notebox_IDs))
+            set_midi($MIDI_CHANNEL, $MIDI_COMMAND_NOTE_ON, get_control_par(%notebox_IDs[$current_division], $CONTROL_PAR_VALUE), 127)
+            set_midi($MIDI_CHANNEL, $MIDI_COMMAND_NOTE_OFF, get_control_par(%notebox_IDs[$current_division], $CONTROL_PAR_VALUE), 127)
+        else 
+            if ($DEBUG = $TRUE)
+                message("CRITICAL ERROR: Array index out of bounds: %NOTES_TO_PRODUCE length: " & num_elements(%notebox_IDs) & " index: " & $current_division)
+            end if
+        end if
+    end if    
+
+    {Should the CC be passed through?}
+    if ($cc_passthrough = $FALSE)
+        ignore_midi
+    end if
+
+    set_text($status, "-------LAST EVENT-------")
+    add_text_line($status, "CC" & $cc_to_monitor & ": " & $param_CC_val_to_check & "   |   Division: " & ($current_division + 1) & "/" & $num_of_cc_divisions)
+    add_text_line($status, "Note # triggered: " & get_control_par(%notebox_IDs[$current_division], $CONTROL_PAR_VALUE))
+
+end on
+
+{**********ui_control $num_of_cc_divisions**********}
+on ui_control($num_of_cc_divisions)
+    call display_note_boxes
+end on

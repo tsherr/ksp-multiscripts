@@ -1,0 +1,204 @@
+{ Compiled on Wed Apr 25 23:01:58 2018 }
+on init
+declare @VERSION_MAJOR
+declare @VERSION_MINOR
+@VERSION_MAJOR := "1"
+@VERSION_MINOR := "0"
+declare @VERSION_NUM
+@VERSION_NUM := @VERSION_MAJOR & "." & @VERSION_MINOR
+declare @SCRIPT_TITLE
+@SCRIPT_TITLE := "Multichannel CC Transformer"
+message("")
+set_ui_height_px(100)
+set_script_title(@SCRIPT_TITLE)
+declare ui_label $channel_select_background(1, 1) 
+set_control_par_str(get_ui_id($channel_select_background),$CONTROL_PAR_TEXT,"")
+set_control_par(get_ui_id($channel_select_background),$CONTROL_PAR_WIDTH,150)
+set_control_par(get_ui_id($channel_select_background),$CONTROL_PAR_HEIGHT,75)
+set_control_par(get_ui_id($channel_select_background),$CONTROL_PAR_POS_X,70)
+set_control_par(get_ui_id($channel_select_background),$CONTROL_PAR_POS_Y,2)
+declare ui_label $channel_select_label(1, 1) 
+set_control_par_str(get_ui_id($channel_select_label),$CONTROL_PAR_TEXT,"Channel:")
+set_control_par(get_ui_id($channel_select_label),$CONTROL_PAR_TEXT_ALIGNMENT,1)
+set_control_par(get_ui_id($channel_select_label),$CONTROL_PAR_FONT_TYPE,17)
+set_control_par(get_ui_id($channel_select_label),$CONTROL_PAR_WIDTH,get_control_par(get_ui_id($channel_select_background),$CONTROL_PAR_WIDTH))
+set_control_par(get_ui_id($channel_select_label),$CONTROL_PAR_POS_X,get_control_par(get_ui_id($channel_select_background),$CONTROL_PAR_POS_X))
+set_control_par(get_ui_id($channel_select_label),$CONTROL_PAR_POS_Y,10)
+declare ui_menu $channel_select
+set_control_par(get_ui_id($channel_select),$CONTROL_PAR_POS_Y,30)
+set_control_par(get_ui_id($channel_select),$CONTROL_PAR_WIDTH,get_control_par(get_ui_id($channel_select_background),$CONTROL_PAR_WIDTH)-30)
+set_control_par(get_ui_id($channel_select),$CONTROL_PAR_POS_X,get_control_par(get_ui_id($channel_select_background),$CONTROL_PAR_POS_X)+((get_control_par(get_ui_id($channel_select_background),$CONTROL_PAR_WIDTH)-get_control_par(get_ui_id($channel_select),$CONTROL_PAR_WIDTH))/2))
+declare ui_menu $transform_type
+set_control_par(get_ui_id($transform_type),$CONTROL_PAR_POS_Y,get_control_par(get_ui_id($channel_select),$CONTROL_PAR_POS_Y))
+set_control_par(get_ui_id($transform_type),$CONTROL_PAR_POS_X,240)
+set_control_par(get_ui_id($transform_type),$CONTROL_PAR_WIDTH,75)
+declare ui_value_edit $source_cc(0, 127, 1) 
+set_control_par(get_ui_id($source_cc),$CONTROL_PAR_POS_Y,get_control_par(get_ui_id($transform_type),$CONTROL_PAR_POS_Y))
+set_control_par(get_ui_id($source_cc),$CONTROL_PAR_POS_X,get_control_par(get_ui_id($transform_type),$CONTROL_PAR_POS_X)+get_control_par(get_ui_id($transform_type),$CONTROL_PAR_WIDTH)+10)
+set_control_par(get_ui_id($source_cc),$CONTROL_PAR_WIDTH,75)
+set_control_par_str(get_ui_id($source_cc),$CONTROL_PAR_TEXT,"CC")
+declare ui_label $values_to_label(1, 1) 
+set_control_par(get_ui_id($values_to_label),$CONTROL_PAR_POS_Y,get_control_par(get_ui_id($transform_type),$CONTROL_PAR_POS_Y))
+set_control_par(get_ui_id($values_to_label),$CONTROL_PAR_POS_X,get_control_par(get_ui_id($source_cc),$CONTROL_PAR_POS_X)+get_control_par(get_ui_id($source_cc),$CONTROL_PAR_WIDTH)+10)
+set_control_par(get_ui_id($values_to_label),$CONTROL_PAR_WIDTH,60)
+set_control_par_str(get_ui_id($values_to_label),$CONTROL_PAR_TEXT,"values to")
+set_control_par(get_ui_id($values_to_label),$CONTROL_PAR_HIDE,$HIDE_PART_BG)
+set_control_par(get_ui_id($values_to_label),$CONTROL_PAR_FONT_TYPE,16)
+declare ui_value_edit $target_cc(0, 127, 1) 
+set_control_par(get_ui_id($target_cc),$CONTROL_PAR_POS_Y,get_control_par(get_ui_id($transform_type),$CONTROL_PAR_POS_Y))
+set_control_par(get_ui_id($target_cc),$CONTROL_PAR_POS_X,get_control_par(get_ui_id($values_to_label),$CONTROL_PAR_POS_X)+get_control_par(get_ui_id($values_to_label),$CONTROL_PAR_WIDTH)+10)
+set_control_par(get_ui_id($target_cc),$CONTROL_PAR_WIDTH,75)
+set_control_par_str(get_ui_id($target_cc),$CONTROL_PAR_TEXT,"CC")
+declare ui_label $and_label(1, 1) 
+set_control_par(get_ui_id($and_label),$CONTROL_PAR_POS_Y,get_control_par(get_ui_id($transform_type),$CONTROL_PAR_POS_Y)+25)
+set_control_par(get_ui_id($and_label),$CONTROL_PAR_POS_X,get_control_par(get_ui_id($transform_type),$CONTROL_PAR_POS_X))
+set_control_par(get_ui_id($and_label),$CONTROL_PAR_WIDTH,30)
+set_control_par_str(get_ui_id($and_label),$CONTROL_PAR_TEXT,"and")
+set_control_par(get_ui_id($and_label),$CONTROL_PAR_HIDE,$HIDE_PART_BG)
+set_control_par(get_ui_id($and_label),$CONTROL_PAR_FONT_TYPE,16)
+declare ui_menu $ignore_type
+set_control_par(get_ui_id($ignore_type),$CONTROL_PAR_POS_Y,get_control_par(get_ui_id($and_label),$CONTROL_PAR_POS_Y))
+set_control_par(get_ui_id($ignore_type),$CONTROL_PAR_POS_X,get_control_par(get_ui_id($and_label),$CONTROL_PAR_POS_X)+get_control_par(get_ui_id($and_label),$CONTROL_PAR_WIDTH)+10)
+set_control_par(get_ui_id($ignore_type),$CONTROL_PAR_WIDTH,75)
+declare ui_label $on_target_label(1, 1) 
+set_control_par(get_ui_id($on_target_label),$CONTROL_PAR_POS_Y,get_control_par(get_ui_id($and_label),$CONTROL_PAR_POS_Y))
+set_control_par(get_ui_id($on_target_label),$CONTROL_PAR_POS_X,get_control_par(get_ui_id($ignore_type),$CONTROL_PAR_POS_X)+get_control_par(get_ui_id($ignore_type),$CONTROL_PAR_WIDTH)+10)
+set_control_par(get_ui_id($on_target_label),$CONTROL_PAR_WIDTH,100)
+set_control_par_str(get_ui_id($on_target_label),$CONTROL_PAR_TEXT,"other CC 0 values.")
+set_control_par(get_ui_id($on_target_label),$CONTROL_PAR_HIDE,$HIDE_PART_BG)
+set_control_par(get_ui_id($on_target_label),$CONTROL_PAR_FONT_TYPE,16)
+declare ui_label $VersionInfo(0, 0) 
+set_control_par(get_ui_id($VersionInfo),$CONTROL_PAR_WIDTH,300)
+set_control_par(get_ui_id($VersionInfo),$CONTROL_PAR_HEIGHT,15)
+set_control_par(get_ui_id($VersionInfo),$CONTROL_PAR_POS_X,632-get_control_par(get_ui_id($VersionInfo),$CONTROL_PAR_WIDTH))
+set_control_par(get_ui_id($VersionInfo),$CONTROL_PAR_POS_Y,100-get_control_par(get_ui_id($VersionInfo),$CONTROL_PAR_HEIGHT)-4)
+set_control_par(get_ui_id($VersionInfo),$CONTROL_PAR_TEXT_ALIGNMENT,2)
+set_control_par(get_ui_id($VersionInfo),$CONTROL_PAR_FONT_TYPE,15)
+set_control_par(get_ui_id($VersionInfo),$CONTROL_PAR_HIDE,$HIDE_PART_BG)
+set_control_par_str(get_ui_id($VersionInfo),$CONTROL_PAR_TEXT,@SCRIPT_TITLE & " v" & @VERSION_NUM)
+declare %transform_types[64]
+declare %source_ccs[64]
+declare %target_ccs[64]
+declare %ignore_types[64]
+declare $i
+add_menu_item($transform_type,"Do Nothing",0)
+add_menu_item($transform_type,"Copy",1)
+add_menu_item($transform_type,"Change",2)
+add_menu_item($ignore_type,"Allow",0)
+add_menu_item($ignore_type,"Ignore",1)
+$i := 0
+while ($i<=63)
+add_menu_item($channel_select,$i+1,$i)
+inc($i)
+end while
+make_persistent($channel_select)
+make_persistent($source_cc)
+make_persistent($target_cc)
+make_persistent($ignore_type)
+make_persistent($values_to_label)
+make_persistent($and_label)
+make_persistent($on_target_label)
+make_persistent(%transform_types)
+make_persistent(%source_ccs)
+make_persistent(%target_ccs)
+make_persistent(%ignore_types)
+make_persistent($on_target_label)
+read_persistent_var($channel_select)
+read_persistent_var($source_cc)
+read_persistent_var($target_cc)
+read_persistent_var($ignore_type)
+read_persistent_var($values_to_label)
+read_persistent_var($and_label)
+read_persistent_var($on_target_label)
+read_persistent_var(%transform_types)
+read_persistent_var(%source_ccs)
+read_persistent_var(%target_ccs)
+read_persistent_var(%ignore_types)
+read_persistent_var($on_target_label)
+$transform_type := %transform_types[$channel_select]
+$source_cc := %source_ccs[$channel_select]
+$target_cc := %target_ccs[$channel_select]
+$ignore_type := %ignore_types[$channel_select]
+if ($transform_type=0)
+set_control_par(get_ui_id($source_cc),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($target_cc),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($ignore_type),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($values_to_label),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($and_label),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($on_target_label),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+else
+set_control_par(get_ui_id($source_cc),$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+set_control_par(get_ui_id($target_cc),$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+set_control_par(get_ui_id($ignore_type),$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+set_control_par(get_ui_id($values_to_label),$CONTROL_PAR_HIDE,$HIDE_PART_BG)
+set_control_par(get_ui_id($and_label),$CONTROL_PAR_HIDE,$HIDE_PART_BG)
+set_control_par(get_ui_id($on_target_label),$CONTROL_PAR_HIDE,$HIDE_PART_BG)
+end if
+set_control_par_str(get_ui_id($on_target_label),$CONTROL_PAR_TEXT,"other CC " & $target_cc & " values.")
+end on
+function hideOrShowTransformControls
+if ($transform_type=0)
+set_control_par(get_ui_id($source_cc),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($target_cc),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($ignore_type),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($values_to_label),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($and_label),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($on_target_label),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+else
+set_control_par(get_ui_id($source_cc),$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+set_control_par(get_ui_id($target_cc),$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+set_control_par(get_ui_id($ignore_type),$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+set_control_par(get_ui_id($values_to_label),$CONTROL_PAR_HIDE,$HIDE_PART_BG)
+set_control_par(get_ui_id($and_label),$CONTROL_PAR_HIDE,$HIDE_PART_BG)
+set_control_par(get_ui_id($on_target_label),$CONTROL_PAR_HIDE,$HIDE_PART_BG)
+end if
+end function
+on ui_control($channel_select)
+$transform_type := %transform_types[$channel_select]
+$source_cc := %source_ccs[$channel_select]
+$target_cc := %target_ccs[$channel_select]
+$ignore_type := %ignore_types[$channel_select]
+if ($transform_type=0)
+set_control_par(get_ui_id($source_cc),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($target_cc),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($ignore_type),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($values_to_label),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($and_label),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($on_target_label),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+else
+set_control_par(get_ui_id($source_cc),$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+set_control_par(get_ui_id($target_cc),$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+set_control_par(get_ui_id($ignore_type),$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+set_control_par(get_ui_id($values_to_label),$CONTROL_PAR_HIDE,$HIDE_PART_BG)
+set_control_par(get_ui_id($and_label),$CONTROL_PAR_HIDE,$HIDE_PART_BG)
+set_control_par(get_ui_id($on_target_label),$CONTROL_PAR_HIDE,$HIDE_PART_BG)
+end if
+set_control_par_str(get_ui_id($on_target_label),$CONTROL_PAR_TEXT,"other CC " & $target_cc & " values.")
+end on
+on ui_control($transform_type)
+%transform_types[$channel_select] := $transform_type
+call hideOrShowTransformControls
+end on
+on ui_control($source_cc)
+%source_ccs[$channel_select] := $source_cc
+end on
+on ui_control($target_cc)
+%target_ccs[$channel_select] := $target_cc
+set_control_par_str(get_ui_id($on_target_label),$CONTROL_PAR_TEXT,"other CC " & $target_cc & " values.")
+end on
+on ui_control($ignore_type)
+%ignore_types[$channel_select] := $ignore_type
+end on
+on midi_in
+if (%transform_types[$MIDI_CHANNEL] # 0 and ($MIDI_COMMAND=$MIDI_COMMAND_CC))
+if ($MIDI_BYTE_1=%source_ccs[$MIDI_CHANNEL])
+set_midi($MIDI_CHANNEL,$MIDI_COMMAND_CC,%target_ccs[$MIDI_CHANNEL],$MIDI_BYTE_2)
+if (%transform_types[$MIDI_CHANNEL]=2)
+ignore_midi
+end if
+end if
+if (%ignore_types[$MIDI_CHANNEL]=1 and ($MIDI_BYTE_1=%target_ccs[$MIDI_CHANNEL]))
+ignore_midi
+end if
+end if
+end on

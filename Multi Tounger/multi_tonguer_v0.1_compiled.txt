@@ -1,0 +1,261 @@
+{ Compiled on Wed Apr 25 22:58:15 2018 }
+on init
+declare @VERSION_MAJOR
+declare @VERSION_MINOR
+declare @BUILD
+@VERSION_MAJOR := "1"
+@VERSION_MINOR := "0"
+@BUILD := "0"
+declare @VERSION_NUM
+@VERSION_NUM := @VERSION_MAJOR & "." & @VERSION_MINOR & "." & @BUILD
+declare @SCRIPT_TITLE
+@SCRIPT_TITLE := "Multi-Tonguer"
+SET_CONDITION(NO_SYS_SCRIPT_RLS_TRIG)
+set_ui_height_px(110)
+set_script_title(@SCRIPT_TITLE)
+make_perfview
+message("")
+declare ui_label $la_keyswitch(1, 1) 
+set_control_par(get_ui_id($la_keyswitch),$CONTROL_PAR_WIDTH,200)
+set_control_par(get_ui_id($la_keyswitch),$CONTROL_PAR_HEIGHT,80)
+set_control_par(get_ui_id($la_keyswitch),$CONTROL_PAR_POS_X,60)
+set_control_par(get_ui_id($la_keyswitch),$CONTROL_PAR_POS_Y,5)
+set_text($la_keyswitch,"KEYSWITCH")
+set_control_par(get_ui_id($la_keyswitch),$CONTROL_PAR_FONT_TYPE,16)
+set_control_par(get_ui_id($la_keyswitch),$CONTROL_PAR_TEXT_ALIGNMENT,1)
+declare ui_label $la_double(1, 1) 
+set_control_par(get_ui_id($la_double),$CONTROL_PAR_WIDTH,50)
+set_control_par(get_ui_id($la_double),$CONTROL_PAR_HEIGHT,20)
+set_control_par(get_ui_id($la_double),$CONTROL_PAR_POS_X,60)
+set_control_par(get_ui_id($la_double),$CONTROL_PAR_POS_Y,31)
+set_text($la_double,"Double")
+set_control_par(get_ui_id($la_double),$CONTROL_PAR_FONT_TYPE,17)
+set_control_par(get_ui_id($la_double),$CONTROL_PAR_TEXT_ALIGNMENT,1)
+hide_part($la_double,$HIDE_PART_BG)
+declare ui_label $la_triple(1, 1) 
+set_control_par(get_ui_id($la_triple),$CONTROL_PAR_WIDTH,50)
+set_control_par(get_ui_id($la_triple),$CONTROL_PAR_HEIGHT,20)
+set_control_par(get_ui_id($la_triple),$CONTROL_PAR_POS_X,60)
+set_control_par(get_ui_id($la_triple),$CONTROL_PAR_POS_Y,61)
+set_text($la_triple,"Triple")
+set_control_par(get_ui_id($la_triple),$CONTROL_PAR_FONT_TYPE,17)
+set_control_par(get_ui_id($la_triple),$CONTROL_PAR_TEXT_ALIGNMENT,1)
+hide_part($la_triple,$HIDE_PART_BG)
+declare ui_value_edit $va_double_keyswitch(0, 127, 1) 
+set_control_par(get_ui_id($va_double_keyswitch),$CONTROL_PAR_WIDTH,70)
+set_control_par(get_ui_id($va_double_keyswitch),$CONTROL_PAR_HEIGHT,20)
+set_control_par(get_ui_id($va_double_keyswitch),$CONTROL_PAR_POS_X,115)
+set_control_par(get_ui_id($va_double_keyswitch),$CONTROL_PAR_POS_Y,30)
+$va_double_keyswitch := 21
+set_text($va_double_keyswitch,"Note #")
+make_persistent($va_double_keyswitch)
+declare ui_value_edit $va_triple_keyswitch(0, 127, 1) 
+set_control_par(get_ui_id($va_triple_keyswitch),$CONTROL_PAR_WIDTH,70)
+set_control_par(get_ui_id($va_triple_keyswitch),$CONTROL_PAR_HEIGHT,20)
+set_control_par(get_ui_id($va_triple_keyswitch),$CONTROL_PAR_POS_X,115)
+set_control_par(get_ui_id($va_triple_keyswitch),$CONTROL_PAR_POS_Y,60)
+$va_triple_keyswitch := 22
+set_text($va_triple_keyswitch,"Note #")
+make_persistent($va_triple_keyswitch)
+declare ui_switch $tb_double_learn_keyswitch
+set_control_par(get_ui_id($tb_double_learn_keyswitch),$CONTROL_PAR_WIDTH,55)
+set_control_par(get_ui_id($tb_double_learn_keyswitch),$CONTROL_PAR_HEIGHT,18)
+set_control_par(get_ui_id($tb_double_learn_keyswitch),$CONTROL_PAR_POS_X,197)
+set_control_par(get_ui_id($tb_double_learn_keyswitch),$CONTROL_PAR_POS_Y,30)
+set_text($tb_double_learn_keyswitch,"Learn")
+set_control_par(get_ui_id($tb_double_learn_keyswitch),$CONTROL_PAR_TEXT_ALIGNMENT,1)
+declare ui_switch $tb_triple_learn_keyswitch
+set_control_par(get_ui_id($tb_triple_learn_keyswitch),$CONTROL_PAR_WIDTH,55)
+set_control_par(get_ui_id($tb_triple_learn_keyswitch),$CONTROL_PAR_HEIGHT,18)
+set_control_par(get_ui_id($tb_triple_learn_keyswitch),$CONTROL_PAR_POS_X,197)
+set_control_par(get_ui_id($tb_triple_learn_keyswitch),$CONTROL_PAR_POS_Y,60)
+set_text($tb_triple_learn_keyswitch,"Learn")
+set_control_par(get_ui_id($tb_triple_learn_keyswitch),$CONTROL_PAR_TEXT_ALIGNMENT,1)
+declare ui_label $la_note_duration(1, 1) 
+set_control_par(get_ui_id($la_note_duration),$CONTROL_PAR_WIDTH,125)
+set_control_par(get_ui_id($la_note_duration),$CONTROL_PAR_HEIGHT,80)
+set_control_par(get_ui_id($la_note_duration),$CONTROL_PAR_POS_X,275)
+set_control_par(get_ui_id($la_note_duration),$CONTROL_PAR_POS_Y,5)
+set_text($la_note_duration,"NOTE DURATION")
+set_control_par(get_ui_id($la_note_duration),$CONTROL_PAR_FONT_TYPE,16)
+set_control_par(get_ui_id($la_note_duration),$CONTROL_PAR_TEXT_ALIGNMENT,1)
+declare ui_value_edit $va_note_duration(1, 1000, 1) 
+set_control_par(get_ui_id($va_note_duration),$CONTROL_PAR_WIDTH,75)
+set_control_par(get_ui_id($va_note_duration),$CONTROL_PAR_HEIGHT,18)
+set_control_par(get_ui_id($va_note_duration),$CONTROL_PAR_POS_X,300)
+set_control_par(get_ui_id($va_note_duration),$CONTROL_PAR_POS_Y,45)
+$va_note_duration := 50
+set_text($va_note_duration,"ms")
+make_persistent($va_note_duration)
+declare ui_label $la_velocity_difference(1, 1) 
+set_control_par(get_ui_id($la_velocity_difference),$CONTROL_PAR_WIDTH,150)
+set_control_par(get_ui_id($la_velocity_difference),$CONTROL_PAR_HEIGHT,80)
+set_control_par(get_ui_id($la_velocity_difference),$CONTROL_PAR_POS_X,416)
+set_control_par(get_ui_id($la_velocity_difference),$CONTROL_PAR_POS_Y,5)
+set_text($la_velocity_difference,"VELOCITY DIFFERENCE")
+set_control_par(get_ui_id($la_velocity_difference),$CONTROL_PAR_FONT_TYPE,16)
+set_control_par(get_ui_id($la_velocity_difference),$CONTROL_PAR_TEXT_ALIGNMENT,1)
+declare ui_value_edit $va_velocity_diff(-127, 127, 1) 
+set_control_par(get_ui_id($va_velocity_diff),$CONTROL_PAR_WIDTH,75)
+set_control_par(get_ui_id($va_velocity_diff),$CONTROL_PAR_HEIGHT,18)
+set_control_par(get_ui_id($va_velocity_diff),$CONTROL_PAR_POS_X,455)
+set_control_par(get_ui_id($va_velocity_diff),$CONTROL_PAR_POS_Y,45)
+$va_velocity_diff := -5
+set_text($va_velocity_diff,"delta")
+make_persistent($va_velocity_diff)
+declare ui_label $la_version(1, 1) 
+set_control_par(get_ui_id($la_version),$CONTROL_PAR_WIDTH,300)
+set_control_par(get_ui_id($la_version),$CONTROL_PAR_HEIGHT,18)
+set_control_par(get_ui_id($la_version),$CONTROL_PAR_POS_X,60)
+set_control_par(get_ui_id($la_version),$CONTROL_PAR_POS_Y,90)
+set_text($la_version,@SCRIPT_TITLE & " v" & @VERSION_NUM & " - www.tobysherriff.net")
+set_control_par(get_ui_id($la_version),$CONTROL_PAR_FONT_TYPE,12)
+hide_part($la_version,$HIDE_PART_BG)
+declare $double_learn_mode_on
+$double_learn_mode_on := 0
+declare $triple_learn_mode_on
+$triple_learn_mode_on := 0
+declare %last_velocity[127]
+declare %last_noteon_timestamp[127]
+declare $multi_tongue_velocity := 0
+declare $double_tongue_active
+$double_tongue_active := 0
+declare $triple_tongue_active
+$triple_tongue_active := 0
+declare $time_between_notes := 0
+end on
+function tb_double_learn_keyswitch_handler
+if ($tb_double_learn_keyswitch=1)
+set_control_par(get_ui_id($tb_double_learn_keyswitch),$CONTROL_PAR_FONT_TYPE,22)
+else
+set_control_par(get_ui_id($tb_double_learn_keyswitch),$CONTROL_PAR_FONT_TYPE,24)
+end if
+if ($tb_double_learn_keyswitch=1)
+set_text($tb_double_learn_keyswitch,"Learning")
+$double_learn_mode_on := 1
+else
+set_text($tb_double_learn_keyswitch,"Learn")
+$double_learn_mode_on := 0
+$double_tongue_active := 0
+end if
+end function
+function tb_triple_learn_keyswitch_handler
+if ($tb_triple_learn_keyswitch=1)
+set_control_par(get_ui_id($tb_triple_learn_keyswitch),$CONTROL_PAR_FONT_TYPE,22)
+else
+set_control_par(get_ui_id($tb_triple_learn_keyswitch),$CONTROL_PAR_FONT_TYPE,24)
+end if
+if ($tb_triple_learn_keyswitch=1)
+set_text($tb_triple_learn_keyswitch,"Learning")
+$triple_learn_mode_on := 1
+else
+set_text($tb_triple_learn_keyswitch,"Learn")
+$triple_learn_mode_on := 0
+$triple_tongue_active := 0
+end if
+end function
+on ui_control($va_double_keyswitch)
+$double_tongue_active := 0
+end on
+on ui_control($va_triple_keyswitch)
+$triple_tongue_active := 0
+end on
+on midi_in
+if ($MIDI_COMMAND=$MIDI_COMMAND_NOTE_ON and ($MIDI_BYTE_2>0))
+if ($double_learn_mode_on=1)
+ignore_midi
+$va_double_keyswitch := $MIDI_BYTE_1
+$tb_double_learn_keyswitch := 0
+if ($tb_double_learn_keyswitch=1)
+set_control_par(get_ui_id($tb_double_learn_keyswitch),$CONTROL_PAR_FONT_TYPE,22)
+else
+set_control_par(get_ui_id($tb_double_learn_keyswitch),$CONTROL_PAR_FONT_TYPE,24)
+end if
+if ($tb_double_learn_keyswitch=1)
+set_text($tb_double_learn_keyswitch,"Learning")
+$double_learn_mode_on := 1
+else
+set_text($tb_double_learn_keyswitch,"Learn")
+$double_learn_mode_on := 0
+$double_tongue_active := 0
+end if
+end if
+if ($triple_learn_mode_on=1)
+ignore_midi
+$va_triple_keyswitch := $MIDI_BYTE_1
+$tb_triple_learn_keyswitch := 0
+if ($tb_triple_learn_keyswitch=1)
+set_control_par(get_ui_id($tb_triple_learn_keyswitch),$CONTROL_PAR_FONT_TYPE,22)
+else
+set_control_par(get_ui_id($tb_triple_learn_keyswitch),$CONTROL_PAR_FONT_TYPE,24)
+end if
+if ($tb_triple_learn_keyswitch=1)
+set_text($tb_triple_learn_keyswitch,"Learning")
+$triple_learn_mode_on := 1
+else
+set_text($tb_triple_learn_keyswitch,"Learn")
+$triple_learn_mode_on := 0
+$triple_tongue_active := 0
+end if
+end if
+%last_velocity[$MIDI_BYTE_1] := $MIDI_BYTE_2
+%last_noteon_timestamp[$MIDI_BYTE_1] := $ENGINE_UPTIME
+if ($MIDI_BYTE_1=$va_double_keyswitch)
+$double_tongue_active := 1
+else
+if ($MIDI_BYTE_1=$va_triple_keyswitch)
+$triple_tongue_active := 1
+else
+if ($double_tongue_active=1 or ($triple_tongue_active=1))
+wait($va_note_duration*1000)
+set_midi($MIDI_CHANNEL,$MIDI_COMMAND_NOTE_ON,$MIDI_BYTE_1,0)
+end if
+end if
+end if
+else
+if ($MIDI_COMMAND=$MIDI_COMMAND_NOTE_OFF or ($MIDI_COMMAND=$MIDI_COMMAND_NOTE_ON and ($MIDI_BYTE_2=0)))
+if ($MIDI_BYTE_1=$va_double_keyswitch)
+$double_tongue_active := 0
+end if
+if ($MIDI_BYTE_1=$va_triple_keyswitch)
+$double_tongue_active := 0
+end if
+if ($MIDI_BYTE_1 # $va_double_keyswitch and ($MIDI_BYTE_1 # $va_triple_keyswitch))
+$time_between_notes := $ENGINE_UPTIME-%last_noteon_timestamp[$MIDI_BYTE_1]
+if ($time_between_notes<1000)
+$multi_tongue_velocity := %last_velocity[$MIDI_BYTE_1]+$va_velocity_diff
+if ($multi_tongue_velocity>127)
+$multi_tongue_velocity := 127
+else
+if ($multi_tongue_velocity<1)
+$multi_tongue_velocity := 1
+end if
+end if
+if ($double_tongue_active=1)
+ignore_midi
+set_midi($MIDI_CHANNEL,$MIDI_COMMAND_NOTE_ON,$MIDI_BYTE_1,$multi_tongue_velocity)
+wait($va_note_duration*1000)
+set_midi($MIDI_CHANNEL,$MIDI_COMMAND_NOTE_ON,$MIDI_BYTE_1,0)
+else
+if ($triple_tongue_active=1)
+ignore_midi
+set_midi($MIDI_CHANNEL,$MIDI_COMMAND_NOTE_ON,$MIDI_BYTE_1,$multi_tongue_velocity)
+wait($va_note_duration*1000)
+set_midi($MIDI_CHANNEL,$MIDI_COMMAND_NOTE_ON,$MIDI_BYTE_1,0)
+wait($time_between_notes*1000)
+set_midi($MIDI_CHANNEL,$MIDI_COMMAND_NOTE_ON,$MIDI_BYTE_1,$multi_tongue_velocity)
+wait($va_note_duration*1000)
+set_midi($MIDI_CHANNEL,$MIDI_COMMAND_NOTE_ON,$MIDI_BYTE_1,0)
+end if
+end if
+end if
+end if
+end if
+end if
+end on
+on ui_control($tb_double_learn_keyswitch)
+call tb_double_learn_keyswitch_handler
+end on
+on ui_control($tb_triple_learn_keyswitch)
+call tb_triple_learn_keyswitch_handler
+end on

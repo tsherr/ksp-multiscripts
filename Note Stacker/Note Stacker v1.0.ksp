@@ -1,0 +1,210 @@
+{Note Staker
+ 	Doubles incoming notes by a user-defined interval. 
+	Incoming notes must match a channel and CC#.
+	Two different intervals are supported, depending on the CC value.
+
+Changelog:
+	v1.0 - Initial implimentation
+}
+
+{ #pragma save_compiled_source note_stacker_v1.0_compiled.txt }
+
+on init
+
+	{------------------------INSTRUMENT INFO------------------------}
+	CreateVersionNumber(VERSION_NUM)
+	declare @SCRIPT_TITLE
+	SCRIPT_TITLE := "Note Stacker"
+
+	{------------------------GENERAL CONSTANTS------------------------}
+	declare const UI_HEIGHT_PX := 112
+	declare const LABEL_FONT_WHITE := 17
+	declare const LABEL_FONT_BLACK := 16
+	declare const LABEL_FONT_SMALL := 12
+	declare const FALSE := 0
+	declare const TRUE := 1
+	declare const UNDEFINED := -1
+	declare const ALIGN_LEFT := 0
+	declare const ALIGN_CENTER := 1
+	declare const ALIGN_RIGHT := 2
+
+	{------------------------INITIALIZATION------------------------}
+	SET_CONDITION(NO_SYS_SCRIPT_RLS_TRIG) {Disable built-in release trigger handling}
+	set_ui_height_px(UI_HEIGHT_PX)
+	set_script_title(SCRIPT_TITLE)
+	make_perfview()
+	message("")
+
+	{------------------------GUI------------------------}
+	MakeLabel(la_input_background, 200, 91, 55, 0, "")
+	MakeLabel(la_input_filter, 200, 20, 55, 5, "INPUT FILTER")
+	SetFont(la_input_filter, LABEL_FONT_WHITE)
+	AlignText(la_input_filter, ALIGN_CENTER)
+
+	MakeLabel(la_A_text, 200, 20, 248, 5, "INTERVAL A")
+	SetFont(la_A_text, LABEL_FONT_BLACK)
+	AlignText(la_A_text, ALIGN_CENTER)
+	hide_part(la_A_text, HIDE_PART_BG)
+
+	MakeLabel(la_B_text, 200, 20, 400, 5, "INTERVAL B")
+	SetFont(la_B_text, LABEL_FONT_BLACK)
+	AlignText(la_B_text, ALIGN_CENTER)
+	hide_part(la_B_text, HIDE_PART_BG)
+
+	{MakeValueEdit(ve_channel_num, 	110, 20, 100,  30, 0, 1,   	16, 	1, 50, "Channel #")}
+	MakeValueEdit(ve_cc_num, 		110, 20, 100,  45, 0,   	127, 	1, 58, "CC #")
+	MakeValueEdit(ve_A_cc_val, 		100, 20, 300, 30, 0, 	127, 	1, 47, "CC Value")
+	MakeValueEdit(ve_B_cc_val, 		100, 20, 450, 30, 0, 	127, 	1, 48, "CC Value")
+	MakeValueEdit(ve_A_interval, 	100, 20, 300, 60, -12, 	12, 	1, 1, "Interval")
+	MakeValueEdit(ve_B_interval, 	100, 20, 450, 60, -12, 	12, 	1, 2, "Interval")
+	{make_persistent(ve_channel_num)}
+	make_persistent(ve_cc_num)
+	make_persistent(ve_A_cc_val)
+	make_persistent(ve_B_cc_val)
+	make_persistent(ve_A_interval)
+	make_persistent(ve_B_interval)
+
+	MakeLabel(la_version, 200, 18, 60, UI_HEIGHT_PX - 20, SCRIPT_TITLE & " v" & VERSION_NUM)
+	SetFont(la_version, LABEL_FONT_SMALL)
+	hide_part(la_version, HIDE_PART_BG)
+
+	{------------------------SETUP------------------------}
+	{Update CC value boxes}
+	ve_cc_num_handler()
+	declare last_A_note_num[64] := (-1) //Store separate note nums for each channel
+	declare last_B_note_num[64] := (-1)
+	
+end on
+
+OnValueEdit(ve_cc_num)
+	set_text(ve_A_cc_val, "CC " & ve_cc_num & " Value")
+	set_text(ve_B_cc_val, "CC " & ve_cc_num & " Value")
+EndOnValueEdit
+
+{Stops the current note in stack A or B, if one is playing.
+	stack = 0 (stack A), or 1 (stack B)
+}
+function stop_stack_note(stack, channel)
+	if (stack = 0) {STACK A}
+		if (last_A_note_num[channel] >= 0) 
+			set_midi(channel, $MIDI_COMMAND_NOTE_ON, last_A_note_num[channel], 0)
+			set_midi(channel, $MIDI_COMMAND_NOTE_ON, last_A_note_num[channel] + ve_A_interval, 0)
+			last_A_note_num[channel] := -1;
+		end if
+	else if (stack = 1) {STACK B}
+		if (last_B_note_num[channel] >= 0)
+			set_midi(channel, $MIDI_COMMAND_NOTE_ON, last_B_note_num[channel], 0)
+			set_midi(channel, $MIDI_COMMAND_NOTE_ON, last_B_note_num[channel] + ve_B_interval, 0)
+			last_B_note_num[channel] := -1;
+		end if
+	end if
+end function
+
+{Starts a note in stack A or B (the original note plus its corresponding interval)
+	stack = 0 (stack A), or 1 (stack B)
+	note = the note number to play
+	velocity = the velocity with which to trigger the note
+}
+function start_stack_note(stack, note, velocity, channel)
+	if (stack = 0) {STACK A}
+		set_midi(channel, $MIDI_COMMAND_NOTE_ON, note, velocity)
+		set_midi(channel, $MIDI_COMMAND_NOTE_ON, note + ve_A_interval, velocity)
+		last_A_note_num[channel] := note;
+	else if (stack = 1) {STACK B}
+		set_midi(channel, $MIDI_COMMAND_NOTE_ON, note, velocity)
+		set_midi(channel, $MIDI_COMMAND_NOTE_ON, note + ve_B_interval, velocity)
+		last_B_note_num[channel] := note;
+	end if
+end function
+
+macro OnValueEdit(#control#)
+	on ui_control(#control#)
+		call #control#_handler()
+	end on
+	function #control#_handler()
+end macro
+
+macro EndOnValueEdit()
+	end function
+end macro
+
+macro CreateVersionNumber(#varname#)
+
+	declare @VERSION_MAJOR
+	declare @VERSION_MINOR
+	declare @BUILD
+
+	VERSION_MAJOR := "1"
+	VERSION_MINOR := "0"
+	BUILD := "0"
+
+	declare @#varname#
+	#varname# := "v" & VERSION_MAJOR & "." & VERSION_MINOR & "." & BUILD
+end macro
+
+macro MakeLabel(#name#, #width#, #height#, #xpos#, #ypos#, #text#)
+	declare ui_label #name#(1, 1)
+	MakeControlBase(#name#, #width#, #height#, #xpos#, #ypos#)
+	set_text(#name#, #text#)
+end macro
+
+macro MakeValueEdit(#name#, #width#, #height#, #xpos#, #ypos#, #min#, #max#, #ratio#, #default#, #text#)
+	declare ui_value_edit #name#(#min#, #max#, #ratio#)
+	MakeControlBase(#name#, #width#, #height#, #xpos#, #ypos#)
+	#name# := #default#
+	set_text(#name#, #text#)
+end macro
+
+macro MakeControlBase(#name#, #width#, #height#, #xpos#, #ypos#)
+	declare #name#_index
+	#name#->width := #width#
+	#name#->height := #height#
+	#name#->x := #xpos#
+	#name#->y := #ypos#
+end macro
+
+macro SetFont(#control#, #font#)
+	set_control_par(#control#, CONTROL_PAR_FONT_TYPE, #font#)
+end macro
+
+macro AlignText(#control#, #alignment#)
+	set_control_par(#control#, CONTROL_PAR_TEXT_ALIGNMENT, #alignment#)
+end macro
+
+{**********midi_in**********}
+on midi_in
+
+	{Ignore events on other channels (make sure this is the same channel as the one we've selected, regardless of port)}
+	{if (($MIDI_CHANNEL # ve_channel_num - 1) and ($MIDI_CHANNEL # (ve_channel_num - 1) + 16) and ($MIDI_CHANNEL # (ve_channel_num - 1) + 32) and ($MIDI_CHANNEL # (ve_channel_num - 1) + 48))
+		exit
+	end if}
+
+	{Is this in A stack or B stack?}
+	if (CC[ve_cc_num] = ve_A_cc_val) {A STACK}
+
+		{NOTE ON}
+		if ($MIDI_COMMAND = $MIDI_COMMAND_NOTE_ON and $MIDI_BYTE_2 > 0) 	
+			stop_stack_note(0, $MIDI_CHANNEL)
+			start_stack_note(0, $MIDI_BYTE_1, $MIDI_BYTE_2, $MIDI_CHANNEL)
+ 		end if 		
+
+ 	else if (CC[ve_cc_num] = ve_B_cc_val) {B STACK}
+
+ 		{NOTE ON}
+		if ($MIDI_COMMAND = $MIDI_COMMAND_NOTE_ON and $MIDI_BYTE_2 > 0) 	
+			stop_stack_note(1, $MIDI_CHANNEL)
+			start_stack_note(1, $MIDI_BYTE_1, $MIDI_BYTE_2, $MIDI_CHANNEL)
+ 		end if
+
+	end if
+
+	{Regardless of the CC value, stop a stack note if the note-off note is used by a stack}
+	if ($MIDI_COMMAND = $MIDI_COMMAND_NOTE_OFF or ($MIDI_COMMAND = $MIDI_COMMAND_NOTE_ON and $MIDI_BYTE_2 = 0)) {NOTE OFF}
+		if ($MIDI_BYTE_1 = last_A_note_num[$MIDI_CHANNEL])
+			stop_stack_note(0, $MIDI_CHANNEL)
+		end if
+		if ($MIDI_BYTE_1 = last_B_note_num[$MIDI_CHANNEL])
+			stop_stack_note(1, $MIDI_CHANNEL)
+		end if 		
+ 	end if	
+end on

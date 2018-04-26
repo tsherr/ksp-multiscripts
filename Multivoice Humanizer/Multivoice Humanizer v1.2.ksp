@@ -1,0 +1,457 @@
+{Multivoice Humanizer - Adds subtle variations to various paramters. Voices (channel) settings can be modified independently.
+
+Changelog:
+	v1.2 - Removed CC randomizer
+	v1.1 - Changed CC modified from absolute value to delta
+	v1.0 - Initial implimentation
+}
+
+{ #pragma save_compiled_source multivoice_humanizer_v1.2_compiled.txt }
+
+on init
+
+	{***Version Information***}
+	declare @VERSION_NUMBER
+	VERSION_NUMBER := "1.2"
+	declare @SCRIPT_TITLE
+	SCRIPT_TITLE := "Multivoice Humanizer"
+
+	{***Globals and constants***}
+    declare const TRUE := 1
+    declare const FALSE := 0
+    declare const VEL_DELTA_MIN := -127
+    declare const VEL_DELTA_MAX := 127
+    declare const CC_DELTA_MIN := -127
+    declare const CC_DELTA_MAX := 127
+    declare const MAX_DELAY_MS := 1000
+    declare const WARNING_TEXT_TIMEOUT_SEC := 3
+
+    {Script info}
+    declare ui_label title(1, 1)
+    set_text(title, SCRIPT_TITLE & " v" & VERSION_NUMBER & " - www.tobysherriff.net")
+    move_control_px(title, 55, 44)
+    hide_part(title, $HIDE_PART_BG)
+    set_control_par(title, CONTROL_PAR_WIDTH, 300)
+    set_control_par(title, CONTROL_PAR_HEIGHT, 18)
+    set_control_par($title, CONTROL_PAR_FONT_TYPE, 12)
+
+    {***UI Setup***}
+    message("")
+    set_script_title(SCRIPT_TITLE) 
+    set_ui_height_px(65)
+
+    declare ui_label lab_background(1, 2)
+	move_control_px($lab_background,275, 0)
+	set_control_par(get_ui_id($lab_background),$CONTROL_PAR_WIDTH, 360)
+    set_control_par(lab_background, CONTROL_PAR_HEIGHT, 39)
+    set_text(lab_background, "")
+
+    declare ui_label lab_channel(1, 1)
+    move_control_px(lab_channel, 60, 0)
+    set_control_par(lab_channel, CONTROL_PAR_WIDTH, 110)
+	set_text(lab_channel, "Select Channel:")
+
+    declare ui_menu men_channel_select
+    move_control_px(men_channel_select, 180, 0)
+    set_control_par(men_channel_select, CONTROL_PAR_WIDTH, 85)
+    declare $i := 0
+	while (i < 64)
+		select (i)
+		case 0 to 15
+			add_menu_item(men_channel_select,"[A] " & (i mod 16) + 1, i)
+		case 16 to 31
+			add_menu_item(men_channel_select,"[B] " & (i mod 16) + 1, i)
+		case 32 to 47
+			add_menu_item(men_channel_select,"[C] " & (i mod 16) + 1, i)
+		case 48 to 63
+			add_menu_item(men_channel_select,"[D] " & (i mod 16) + 1, i)
+		end select
+		inc(i)
+	end while
+	set_control_help(men_channel_select, "Channel selector: min/max values will affect the selected channel only")
+
+	{declare ui_label lab_cc(1, 1)
+	    move_control_px(lab_cc, 60, 21)
+	    set_control_par(lab_cc, CONTROL_PAR_WIDTH, 110)
+		set_text(lab_cc, "Outgoing CC #")
+	
+		declare ui_value_edit val_cc(0, 127, 1)
+		move_control_px(val_cc, 220, 21)
+		set_control_par(val_cc, CONTROL_PAR_WIDTH, 45)
+		set_text(val_cc, "")
+		make_persistent(val_cc)
+		set_control_help(val_cc, "The CC # to use when transmitting randomized CC changes")
+	
+		declare ui_switch swi_cc
+		move_control_px(swi_cc, 180, 21)
+		set_control_par(swi_cc, CONTROL_PAR_WIDTH, 35)
+		make_persistent(swi_cc)
+		read_persistent_var(swi_cc)
+		set_control_help(swi_cc ,"Enables/disables generating randomized CC values with each note")
+		on_cc_switch()}
+
+	declare ui_switch swi_copy
+	move_control_px(swi_copy, 60, 21)
+	set_control_par(swi_copy, CONTROL_PAR_WIDTH, 110)
+	set_text(swi_copy, "Copy Current to All")
+	set_control_help(swi_copy,"Copies the current channel's settings to all channels")
+
+	declare ui_label lab_copy_confirm(1, 1)
+    move_control_px(lab_copy_confirm, 60, 21)
+    set_control_par(lab_copy_confirm, CONTROL_PAR_WIDTH, 50)
+	set_text(lab_copy_confirm, "Copy?")
+	hide_part(lab_copy_confirm, HIDE_WHOLE_CONTROL)
+
+	declare ui_switch swi_copy_yes
+	move_control_px(swi_copy_yes, 120, 21)
+	set_control_par(swi_copy_yes, CONTROL_PAR_WIDTH, 22)
+	set_text(swi_copy_yes, "Y")
+	hide_part(swi_copy_yes, HIDE_WHOLE_CONTROL)
+	set_control_help(swi_copy_yes,"Confirm Copy")
+
+	declare ui_switch swi_copy_no
+	move_control_px(swi_copy_no, 145, 21)
+	set_control_par(swi_copy_no, CONTROL_PAR_WIDTH, 22)
+	set_text(swi_copy_no, "N")
+	hide_part(swi_copy_no, HIDE_WHOLE_CONTROL)
+	set_control_help(swi_copy_no,"Abort Copy")
+
+	declare ui_switch swi_reset
+	move_control_px(swi_reset, 180, 21)
+	set_control_par(swi_reset, CONTROL_PAR_WIDTH, 85)
+	set_text(swi_reset, "Reset All")
+	set_control_help(swi_reset, "Resets all channel parameters to their default values")
+
+	declare ui_label lab_reset_confirm(1, 1)
+    move_control_px(lab_reset_confirm, 180, 21)
+    set_control_par(lab_reset_confirm, CONTROL_PAR_WIDTH, 42)
+	set_text(lab_reset_confirm, "Reset?")
+	hide_part(lab_reset_confirm, HIDE_WHOLE_CONTROL)
+
+	declare ui_switch swi_reset_yes
+	move_control_px(swi_reset_yes, 223, 21)
+	set_control_par(swi_reset_yes, CONTROL_PAR_WIDTH, 22)
+	set_text(swi_reset_yes, "Y")
+	hide_part(swi_reset_yes, HIDE_WHOLE_CONTROL)
+	set_control_help(swi_reset_yes, "Confirm Reset")
+
+	declare ui_switch swi_reset_no
+	move_control_px(swi_reset_no, 245, 21)
+	set_control_par(swi_reset_no, CONTROL_PAR_WIDTH, 22)
+	set_text(swi_reset_no, "N")
+	hide_part(swi_reset_no, HIDE_WHOLE_CONTROL)
+	set_control_help(swi_reset_no, "Abort Reset")
+
+	declare ui_value_edit val_velocity_low(VEL_DELTA_MIN, 0, 1)
+	move_control(val_velocity_low, 4, 1)
+	set_control_par(val_velocity_low, CONTROL_PAR_WIDTH, 175)
+	set_text(val_velocity_low, "Min velocity delta")
+	set_control_par(val_velocity_low, CONTROL_PAR_DEFAULT_VALUE, 0)
+	val_velocity_low := 0
+	set_control_help(val_velocity_low, "Minimum random amount by which velocities will change (-127 to 0)")
+
+	declare ui_value_edit val_velocity_high(0, VEL_DELTA_MAX, 1)
+	move_control(val_velocity_high, 6, 1)
+	set_control_par(val_velocity_high, CONTROL_PAR_WIDTH, 175)
+	set_text(val_velocity_high, "Max velocity delta")
+	set_control_par(val_velocity_high, CONTROL_PAR_DEFAULT_VALUE, 0)
+	set_control_help(val_velocity_high, "Maximum random amount by which velocities will change (0 to 127)")
+
+	{declare ui_value_edit val_cc_low(CC_DELTA_MIN, 0, 1)
+		move_control(val_cc_low, 4, 2)
+		set_control_par(val_cc_low, CONTROL_PAR_WIDTH, 175)
+		set_text(val_cc_low, "Min CC delta")
+		set_control_par(val_cc_low, CONTROL_PAR_DEFAULT_VALUE, 0)
+		val_cc_low := 0
+		set_control_help(val_cc_low, "Minimum random amount by which the CC value will change (if enabled). The CC message will precede each note-on.")
+	
+		declare ui_value_edit val_cc_high(0, CC_DELTA_MAX, 1)
+		move_control(val_cc_high, 6, 2)
+		set_control_par(val_cc_high, CONTROL_PAR_WIDTH, 175)
+		set_text(val_cc_high, "Max CC delta")
+		set_control_par(val_cc_high, CONTROL_PAR_DEFAULT_VALUE, 0)
+		set_control_help(val_cc_high, "Maximum random amount by which the CC value will change (if enabled). The CC message will precede each note-on.")
+	}
+	declare ui_value_edit val_delay_low(0, MAX_DELAY_MS, 1)
+	move_control(val_delay_low, 4, 2)
+	set_control_par(val_delay_low, CONTROL_PAR_WIDTH, 175)
+	set_text(val_delay_low, "Min delay value (ms)")
+	set_control_par(val_delay_low, CONTROL_PAR_DEFAULT_VALUE, 0)
+	set_control_help(val_delay_low, "Minimum random time (in milliseconds) to wait before a note-on is sent")
+
+	declare ui_value_edit val_delay_high(0, MAX_DELAY_MS, 1)
+	move_control(val_delay_high, 6, 2)
+	set_control_par(val_delay_high, CONTROL_PAR_WIDTH, 175)
+	set_text(val_delay_high, "Max delay value (ms)")
+	set_control_par(val_delay_high, CONTROL_PAR_DEFAULT_VALUE, 0)
+	set_control_help(val_delay_high, "Maximum random time (in milliseconds) to wait before a note-on is sent")
+
+    declare ui_label warning(1, 1)
+    set_text(warning, "")
+    move_control_px(warning, 332, 42)
+    hide_part(warning, $HIDE_PART_BG)
+    set_control_par(warning, CONTROL_PAR_WIDTH, 300)
+    set_control_par(warning, CONTROL_PAR_HEIGHT, 18)
+    set_control_par(warning, CONTROL_PAR_FONT_TYPE, 7)
+    set_control_par(warning, CONTROL_PAR_TEXT_ALIGNMENT, 2)
+
+	{***Variables***}
+	declare temp := -1
+	declare new_vel := -1
+	declare is_processing_note_on[127] := (FALSE)
+	declare warning_timer := 0
+	declare_matrix(note_status, 64, 128)
+	declare CC_VALUES[128] := (0) {Don't use CC[]}
+	declare initialized := FALSE
+
+	{Store the parameter values for each channel (0 - 63)}
+	declare %min_vel[64] := (0)
+	declare %max_vel[64] := (0)
+	declare %min_cc[64] := (0)
+	declare %max_cc[64] := (0)
+	declare %min_delay[64] := (0)
+	declare %max_delay[64] := (0)
+	make_persistent(min_vel)
+	make_persistent(max_vel)
+	make_persistent(min_cc)
+	make_persistent(max_cc)
+	make_persistent(min_delay)
+	make_persistent(max_delay)
+	read_persistent_var(min_vel)
+	read_persistent_var(max_vel)
+	read_persistent_var(min_cc)
+	read_persistent_var(max_cc)
+	read_persistent_var(min_delay)
+	read_persistent_var(max_delay)
+
+	{Display the current channel's parameter values}
+	display_current_channel_parameters()
+end on
+
+
+
+function display_current_channel_parameters
+	val_velocity_low := %min_vel[men_channel_select]
+	val_velocity_high := %max_vel[men_channel_select]
+	{val_cc_low := %min_cc[men_channel_select]
+		val_cc_high := %max_cc[men_channel_select]}
+	val_delay_low := %min_delay[men_channel_select]
+	val_delay_high := %max_delay[men_channel_select]
+end function
+
+{function on_cc_switch
+	if (swi_cc = 0)
+		hide_part(val_cc, HIDE_WHOLE_CONTROL)
+		set_text(swi_cc, "Off")
+	else
+		hide_part(val_cc, HIDE_PART_NOTHING)
+		set_text(swi_cc, "On")
+	end if
+end function}
+
+
+{Creates a matrix}
+macro declare_matrix(#name#, #rows#, #columns#)
+	declare #name#_data[#rows# * #columns#] := (FALSE)
+	declare #name#_rows := #rows#
+	declare #name#_columns := #columns#
+	property #name#
+	  function get(r, c) -> result
+	    result := #name#_data[(r * #columns#) + c]
+	  end function
+	  function set(r, c, value)
+	    #name#_data[(r * #columns#) + c] := value
+	  end function
+	end property
+end macro
+
+function display_warning(text)
+	declare global callbackID
+	callbackID := NI_CALLBACK_ID
+	set_text(warning, text)
+	wait(WARNING_TEXT_TIMEOUT_SEC * 1000000)
+	if (NI_CALLBACK_ID = callbackID)
+		set_text(warning, "")
+	end if
+end function
+
+{on ui_control(swi_cc)
+	on_cc_switch()
+end on}
+
+on ui_control(men_channel_select)
+	display_current_channel_parameters()
+end on
+
+on ui_control(val_velocity_low)
+	min_vel[men_channel_select] := val_velocity_low
+end on
+
+on ui_control(val_velocity_high)
+	max_vel[men_channel_select] := val_velocity_high
+end on
+
+{on ui_control(val_cc_low)
+	if (val_cc_low > val_cc_high)
+			val_cc_low := val_cc_high
+			display_warning("Min CC value must be <= max CC value!")
+		end if
+	min_cc[men_channel_select] := val_cc_low
+end on
+
+on ui_control(val_cc_high)
+	if (val_cc_high < val_cc_low)
+		val_cc_high := val_cc_low
+		display_warning("Max CC value must be >= min CC value!")
+	end if
+	max_cc[men_channel_select] := val_cc_high
+end on}
+
+on ui_control(val_delay_low)
+	if (val_delay_low > val_delay_high)
+		val_delay_low := val_delay_high
+		display_warning("Min delay value must be <= max delay value!")
+	end if
+	min_delay[men_channel_select] := val_delay_low
+end on
+
+on ui_control(val_delay_high)
+	if (val_delay_high < val_delay_low)
+		val_delay_high := val_delay_low
+		display_warning("Max delay value must be >= min delay value!")
+	end if
+	max_delay[men_channel_select] := val_delay_high
+end on
+
+on ui_control(swi_copy)
+	swi_copy := 0
+	hide_part(swi_copy, HIDE_WHOLE_CONTROL)
+	hide_part(lab_copy_confirm, HIDE_PART_NOTHING)
+	hide_part(swi_copy_no, HIDE_PART_NOTHING)
+	hide_part(swi_copy_yes, HIDE_PART_NOTHING)
+end on
+
+on ui_control(swi_copy_no)
+	swi_copy_no := 0
+	hide_part(lab_copy_confirm, HIDE_WHOLE_CONTROL)
+	hide_part(swi_copy_no, HIDE_WHOLE_CONTROL)
+	hide_part(swi_copy_yes, HIDE_WHOLE_CONTROL)
+	hide_part(swi_copy, HIDE_PART_NOTHING)
+end on
+
+on ui_control(swi_copy_yes)
+	swi_copy_yes := 0
+	hide_part(lab_copy_confirm, HIDE_WHOLE_CONTROL)
+	hide_part(swi_copy_no, HIDE_WHOLE_CONTROL)
+	hide_part(swi_copy_yes, HIDE_WHOLE_CONTROL)
+	hide_part(swi_copy, HIDE_PART_NOTHING)
+
+	{copy current settins to all channels}
+	for i := 0 to 63
+		min_vel[i] := min_vel[men_channel_select]
+		max_vel[i] := max_vel[men_channel_select]
+		min_cc[i] := min_cc[men_channel_select]
+		max_cc[i] := max_cc[men_channel_select]
+		min_delay[i] := min_delay[men_channel_select]
+		max_delay[i] := max_delay[men_channel_select]
+	end for
+	display_current_channel_parameters()
+end on
+
+on ui_control(swi_reset)
+	swi_reset := 0
+	hide_part(swi_reset, HIDE_WHOLE_CONTROL)
+	hide_part(lab_reset_confirm, HIDE_PART_NOTHING)
+	hide_part(swi_reset_no, HIDE_PART_NOTHING)
+	hide_part(swi_reset_yes, HIDE_PART_NOTHING)
+end on
+
+on ui_control(swi_reset_no)
+	swi_reset_no := 0
+	hide_part(lab_reset_confirm, HIDE_WHOLE_CONTROL)
+	hide_part(swi_reset_no, HIDE_WHOLE_CONTROL)
+	hide_part(swi_reset_yes, HIDE_WHOLE_CONTROL)
+	hide_part(swi_reset, HIDE_PART_NOTHING)
+end on
+
+on ui_control(swi_reset_yes)
+	swi_reset_yes := 0
+	hide_part(lab_reset_confirm, HIDE_WHOLE_CONTROL)
+	hide_part(swi_reset_no, HIDE_WHOLE_CONTROL)
+	hide_part(swi_reset_yes, HIDE_WHOLE_CONTROL)
+	hide_part(swi_reset, HIDE_PART_NOTHING)
+
+	{reset all channels}
+	for i := 0 to 63
+		min_vel[i] := 0
+		max_vel[i] := 0
+		min_cc[i] := 0
+		max_cc[i] := 0
+		min_delay[i] := 0
+		max_delay[i] := 0
+	end for
+	display_current_channel_parameters()
+end on
+
+on midi_in
+
+	if (initialized = FALSE)
+		{Do initialization stuff (that can't be done in on init) here}
+		for temp := 0 to 127
+			CC_VALUES[temp] := CC[temp]
+		end for
+
+		initialized := TRUE
+	end if
+
+	if (MIDI_COMMAND = MIDI_COMMAND_NOTE_ON and MIDI_BYTE_2 > 0) {Note on}
+
+		ignore_midi
+
+		{Delay}
+		temp := random(min_delay[MIDI_CHANNEL], max_delay[MIDI_CHANNEL])
+		if (temp > 0)
+			wait(temp * 1000) {ms to us}
+		end if
+
+		{if (swi_cc = 1)
+		
+			temp := CC_VALUES[val_cc] + random(min_cc[MIDI_CHANNEL], max_cc[MIDI_CHANNEL])
+				temp := 0
+			end if
+			if (temp > 127)
+				temp := 127
+			end if
+			
+			set_midi(MIDI_CHANNEL, MIDI_COMMAND_CC, val_cc, temp)
+
+		end if}
+
+		{Change Velocity}
+		new_vel := MIDI_BYTE_2 + random(min_vel[MIDI_CHANNEL], max_vel[MIDI_CHANNEL])
+		if (new_vel < 1)
+			new_vel := 1
+		end if
+		if (new_vel > 127)
+			new_vel := 127
+		end if
+
+		set_midi(MIDI_CHANNEL, MIDI_COMMAND_NOTE_ON, MIDI_BYTE_1, new_vel)
+		note_status[MIDI_CHANNEL, MIDI_BYTE_1] := TRUE
+
+	end if
+
+	if ((MIDI_COMMAND = MIDI_COMMAND_NOTE_ON and MIDI_BYTE_2 = 0) or (MIDI_COMMAND = MIDI_COMMAND_NOTE_OFF)) {Note off}
+
+		{To avoid stuck notes, don't process note off until corresponding note-ons have been created}
+		while(note_status[MIDI_CHANNEL, MIDI_BYTE_1] = FALSE)
+			wait(500)
+		end while
+		note_status[MIDI_CHANNEL, MIDI_BYTE_1] := FALSE
+		set_midi(MIDI_CHANNEL, MIDI_COMMAND, MIDI_BYTE_1, MIDI_BYTE_2)
+	end if
+
+	{if (MIDI_COMMAND = MIDI_COMMAND_CC)
+		CC_VALUES[MIDI_BYTE_1] := MIDI_BYTE_2
+	end if}
+end on

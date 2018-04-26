@@ -1,0 +1,102 @@
+{ Compiled on Wed Apr 25 23:15:13 2018 }
+on init
+declare @VERSION_MAJOR
+declare @VERSION_MINOR
+declare @BUILD
+@VERSION_MAJOR := "1"
+@VERSION_MINOR := "0"
+@BUILD := "0"
+declare @VERSION_NUM
+@VERSION_NUM := "v" & @VERSION_MAJOR & "." & @VERSION_MINOR & "." & @BUILD
+declare @SCRIPT_TITLE
+@SCRIPT_TITLE := "Transposer"
+SET_CONDITION(NO_SYS_SCRIPT_RLS_TRIG)
+set_ui_height_px(85)
+set_script_title(@SCRIPT_TITLE)
+make_perfview
+message("")
+declare ui_label $la_input_background(1, 1) 
+set_control_par(get_ui_id($la_input_background),$CONTROL_PAR_WIDTH,200)
+set_control_par(get_ui_id($la_input_background),$CONTROL_PAR_HEIGHT,65)
+set_control_par(get_ui_id($la_input_background),$CONTROL_PAR_POS_X,55)
+set_control_par(get_ui_id($la_input_background),$CONTROL_PAR_POS_Y,0)
+set_text($la_input_background,"")
+declare ui_label $la_input_filter(1, 1) 
+set_control_par(get_ui_id($la_input_filter),$CONTROL_PAR_WIDTH,200)
+set_control_par(get_ui_id($la_input_filter),$CONTROL_PAR_HEIGHT,20)
+set_control_par(get_ui_id($la_input_filter),$CONTROL_PAR_POS_X,55)
+set_control_par(get_ui_id($la_input_filter),$CONTROL_PAR_POS_Y,5)
+set_text($la_input_filter,"INPUT FILTER")
+set_control_par(get_ui_id($la_input_filter),$CONTROL_PAR_FONT_TYPE,17)
+set_control_par(get_ui_id($la_input_filter),$CONTROL_PAR_TEXT_ALIGNMENT,1)
+declare ui_label $la_to(1, 1) 
+set_control_par(get_ui_id($la_to),$CONTROL_PAR_WIDTH,10)
+set_control_par(get_ui_id($la_to),$CONTROL_PAR_HEIGHT,20)
+set_control_par(get_ui_id($la_to),$CONTROL_PAR_POS_X,145)
+set_control_par(get_ui_id($la_to),$CONTROL_PAR_POS_Y,30)
+set_text($la_to,"to")
+set_control_par(get_ui_id($la_input_filter),$CONTROL_PAR_FONT_TYPE,17)
+declare ui_label $la_transpose_text(1, 1) 
+set_control_par(get_ui_id($la_transpose_text),$CONTROL_PAR_WIDTH,200)
+set_control_par(get_ui_id($la_transpose_text),$CONTROL_PAR_HEIGHT,20)
+set_control_par(get_ui_id($la_transpose_text),$CONTROL_PAR_POS_X,248)
+set_control_par(get_ui_id($la_transpose_text),$CONTROL_PAR_POS_Y,5)
+set_text($la_transpose_text,"TRANSPOSE INTERVAL")
+set_control_par(get_ui_id($la_transpose_text),$CONTROL_PAR_FONT_TYPE,16)
+set_control_par(get_ui_id($la_transpose_text),$CONTROL_PAR_TEXT_ALIGNMENT,1)
+hide_part($la_transpose_text,$HIDE_PART_BG)
+declare ui_value_edit $ve_channel_from_num(1, 16, 1) 
+set_control_par(get_ui_id($ve_channel_from_num),$CONTROL_PAR_WIDTH,80)
+set_control_par(get_ui_id($ve_channel_from_num),$CONTROL_PAR_HEIGHT,20)
+set_control_par(get_ui_id($ve_channel_from_num),$CONTROL_PAR_POS_X,65)
+set_control_par(get_ui_id($ve_channel_from_num),$CONTROL_PAR_POS_Y,30)
+$ve_channel_from_num := 9
+set_text($ve_channel_from_num,"Channel #")
+declare ui_value_edit $ve_channel_to_num(1, 16, 1) 
+set_control_par(get_ui_id($ve_channel_to_num),$CONTROL_PAR_WIDTH,80)
+set_control_par(get_ui_id($ve_channel_to_num),$CONTROL_PAR_HEIGHT,20)
+set_control_par(get_ui_id($ve_channel_to_num),$CONTROL_PAR_POS_X,165)
+set_control_par(get_ui_id($ve_channel_to_num),$CONTROL_PAR_POS_Y,30)
+$ve_channel_to_num := 10
+set_text($ve_channel_to_num,"Channel #")
+declare ui_value_edit $ve_transpose_interval(-12, 12, 1) 
+set_control_par(get_ui_id($ve_transpose_interval),$CONTROL_PAR_WIDTH,100)
+set_control_par(get_ui_id($ve_transpose_interval),$CONTROL_PAR_HEIGHT,20)
+set_control_par(get_ui_id($ve_transpose_interval),$CONTROL_PAR_POS_X,300)
+set_control_par(get_ui_id($ve_transpose_interval),$CONTROL_PAR_POS_Y,30)
+$ve_transpose_interval := 12
+set_text($ve_transpose_interval,"Interval")
+make_persistent($ve_channel_from_num)
+make_persistent($ve_transpose_interval)
+declare ui_label $la_version(1, 1) 
+set_control_par(get_ui_id($la_version),$CONTROL_PAR_WIDTH,200)
+set_control_par(get_ui_id($la_version),$CONTROL_PAR_HEIGHT,18)
+set_control_par(get_ui_id($la_version),$CONTROL_PAR_POS_X,60)
+set_control_par(get_ui_id($la_version),$CONTROL_PAR_POS_Y,65)
+set_text($la_version,@SCRIPT_TITLE & " v" & @VERSION_NUM)
+set_control_par(get_ui_id($la_version),$CONTROL_PAR_FONT_TYPE,12)
+hide_part($la_version,$HIDE_PART_BG)
+end on
+on ui_control($ve_channel_from_num)
+if ($ve_channel_from_num>$ve_channel_to_num)
+$ve_channel_from_num := $ve_channel_to_num
+end if
+end on
+on ui_control($ve_channel_to_num)
+if ($ve_channel_to_num<$ve_channel_from_num)
+$ve_channel_to_num := $ve_channel_from_num
+end if
+end on
+on midi_in
+if ($MIDI_CHANNEL>=($ve_channel_from_num-1) and ($MIDI_CHANNEL<=($ve_channel_to_num-1)) or ($MIDI_CHANNEL>=($ve_channel_from_num-1+16) and ($MIDI_CHANNEL<=($ve_channel_to_num-1+16))) or ($MIDI_CHANNEL>=($ve_channel_from_num-1+32) and ($MIDI_CHANNEL<=($ve_channel_to_num-1+32))) or ($MIDI_CHANNEL>=($ve_channel_from_num-1+48) and ($MIDI_CHANNEL<=($ve_channel_to_num-1+48))))
+if ($MIDI_COMMAND=$MIDI_COMMAND_NOTE_ON and ($MIDI_BYTE_2>0))
+ignore_midi
+set_midi($MIDI_CHANNEL,$MIDI_COMMAND_NOTE_ON,$MIDI_BYTE_1+$ve_transpose_interval,$MIDI_BYTE_2)
+else
+if ($MIDI_COMMAND=$MIDI_COMMAND_NOTE_OFF or ($MIDI_COMMAND=$MIDI_COMMAND_NOTE_ON and ($MIDI_BYTE_2=0)))
+ignore_midi
+set_midi($MIDI_CHANNEL,$MIDI_COMMAND,$MIDI_BYTE_1+$ve_transpose_interval,$MIDI_BYTE_2)
+end if
+end if
+end if
+end on

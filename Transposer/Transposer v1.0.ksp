@@ -1,0 +1,139 @@
+{Transposer
+ 	Transposes all notes on a specific MIDI channel
+
+Changelog:
+	v1.0 - Initial implimentation
+}
+
+{ #pragma save_compiled_source transposer_v1.0_compiled.txt }
+
+on init
+
+	{------------------------INSTRUMENT INFO------------------------}
+	CreateVersionNumber(VERSION_NUM)
+	declare @SCRIPT_TITLE
+	SCRIPT_TITLE := "Transposer"
+
+	{------------------------GENERAL CONSTANTS------------------------}
+	declare const UI_HEIGHT_PX := 85
+	declare const LABEL_FONT_WHITE := 17
+	declare const LABEL_FONT_BLACK := 16
+	declare const LABEL_FONT_SMALL := 12
+	declare const FALSE := 0
+	declare const TRUE := 1
+	declare const UNDEFINED := -1
+	declare const ALIGN_LEFT := 0
+	declare const ALIGN_CENTER := 1
+	declare const ALIGN_RIGHT := 2
+
+	{------------------------INITIALIZATION------------------------}
+	{#pragma save_compiled_source E:\tscode\Kontakt Scripts\Transposer\transposer.txt}
+	SET_CONDITION(NO_SYS_SCRIPT_RLS_TRIG) {Disable built-in release trigger handling}
+	set_ui_height_px(UI_HEIGHT_PX)
+	set_script_title(SCRIPT_TITLE)
+	make_perfview()
+	message("")
+
+	{------------------------GUI------------------------}
+	MakeLabel(la_input_background, 200, 65, 55, 0, "")
+	MakeLabel(la_input_filter, 200, 20, 55, 5, "INPUT FILTER")
+	SetFont(la_input_filter, LABEL_FONT_WHITE)
+	AlignText(la_input_filter, ALIGN_CENTER)
+	MakeLabel(la_to, 10, 20, 145, 30, "to")
+	SetFont(la_input_filter, LABEL_FONT_WHITE)
+
+	MakeLabel(la_transpose_text, 200, 20, 248, 5, "TRANSPOSE INTERVAL")
+	SetFont(la_transpose_text, LABEL_FONT_BLACK)
+	AlignText(la_transpose_text, ALIGN_CENTER)
+	hide_part(la_transpose_text, HIDE_PART_BG)
+
+	MakeValueEdit(ve_channel_from_num,	 	80, 20, 65,  30, 0, 1,  16, 1, 9, "Channel #")
+	MakeValueEdit(ve_channel_to_num, 		80, 20, 165,  30, 0, 1,  16, 1, 10, "Channel #")
+	MakeValueEdit(ve_transpose_interval, 	100, 20, 300, 30, 0, -12, 12, 1, 12, "Interval")
+	make_persistent(ve_channel_from_num)
+	make_persistent(ve_transpose_interval)
+
+	MakeLabel(la_version, 200, 18, 60, UI_HEIGHT_PX - 20, SCRIPT_TITLE & " v" & VERSION_NUM)
+	SetFont(la_version, LABEL_FONT_SMALL)
+	hide_part(la_version, HIDE_PART_BG)
+
+	{------------------------SETUP------------------------}
+	declare ncb_temp := 0
+	
+end on
+
+on ui_control(ve_channel_from_num)
+	if (ve_channel_from_num > ve_channel_to_num)
+		ve_channel_from_num := ve_channel_to_num
+	end if
+end on
+
+on ui_control(ve_channel_to_num)
+	if (ve_channel_to_num < ve_channel_from_num)
+		ve_channel_to_num := ve_channel_from_num
+	end if
+end on
+
+macro CreateVersionNumber(#varname#)
+
+	declare @VERSION_MAJOR
+	declare @VERSION_MINOR
+	declare @BUILD
+
+	VERSION_MAJOR := "1"
+	VERSION_MINOR := "0"
+	BUILD := "0"
+
+	declare @#varname#
+	#varname# := "v" & VERSION_MAJOR & "." & VERSION_MINOR & "." & BUILD
+end macro
+
+macro MakeLabel(#name#, #width#, #height#, #xpos#, #ypos#, #text#)
+	declare ui_label #name#(1, 1)
+	MakeControlBase(#name#, #width#, #height#, #xpos#, #ypos#)
+	set_text(#name#, #text#)
+end macro
+
+macro MakeValueEdit(#name#, #width#, #height#, #xpos#, #ypos#, #page#, #min#, #max#, #ratio#, #default#, #text#)
+	declare ui_value_edit #name#(#min#, #max#, #ratio#)
+	MakeControlBase(#name#, #width#, #height#, #xpos#, #ypos#)
+	#name# := #default#
+	set_text(#name#, #text#)
+end macro
+
+macro MakeControlBase(#name#, #width#, #height#, #xpos#, #ypos#)
+	declare #name#_index
+	#name#->width := #width#
+	#name#->height := #height#
+	#name#->x := #xpos#
+	#name#->y := #ypos#
+end macro
+
+macro SetFont(#control#, #font#)
+	set_control_par(#control#, CONTROL_PAR_FONT_TYPE, #font#)
+end macro
+
+macro AlignText(#control#, #alignment#)
+	set_control_par(#control#, CONTROL_PAR_TEXT_ALIGNMENT, #alignment#)
+end macro
+
+{**********midi_in**********}
+on midi_in
+
+	{Ignore events on other channels (make sure this is the same channel as the one we've selected, regardless of port)}
+	if ((MIDI_CHANNEL >= ve_channel_from_num - 1 and MIDI_CHANNEL <= ve_channel_to_num - 1) or (MIDI_CHANNEL >= ve_channel_from_num - 1 + 16 and MIDI_CHANNEL <= ve_channel_to_num - 1 + 16) or (MIDI_CHANNEL >= ve_channel_from_num - 1 + 32 and MIDI_CHANNEL <= ve_channel_to_num - 1 + 32) or (MIDI_CHANNEL >= ve_channel_from_num - 1 + 48 and MIDI_CHANNEL <= ve_channel_to_num - 1 + 48))
+
+	{NOTE ON}
+		if (MIDI_COMMAND = MIDI_COMMAND_NOTE_ON and MIDI_BYTE_2 > 0) 	
+			ignore_midi
+			set_midi(MIDI_CHANNEL, MIDI_COMMAND_NOTE_ON, MIDI_BYTE_1 + ve_transpose_interval, MIDI_BYTE_2)
+
+		{NOTE_OFF}
+		else if (MIDI_COMMAND = MIDI_COMMAND_NOTE_OFF or (MIDI_COMMAND = MIDI_COMMAND_NOTE_ON and $MIDI_BYTE_2 = 0))
+			ignore_midi
+			set_midi(MIDI_CHANNEL, MIDI_COMMAND, MIDI_BYTE_1 + ve_transpose_interval, $MIDI_BYTE_2)
+		end if
+
+	end if
+	
+end on

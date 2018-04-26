@@ -1,0 +1,279 @@
+{Multi Tonguer
+ 	Transposes all notes on a specific MIDI channel
+
+	Version History:
+	v1.0.0 - Initial Implementation
+}
+
+{ #pragma save_compiled_source multi_tonguer_v0.1_compiled.txt }
+
+on init
+
+	{------------------------INSTRUMENT INFO------------------------}
+	CreateVersionNumber(VERSION_NUM)
+	declare @SCRIPT_TITLE
+	SCRIPT_TITLE := "Multi-Tonguer"
+
+	{------------------------GENERAL CONSTANTS------------------------}
+	declare const FALSE := 0
+	declare const TRUE := 1
+	declare const UNDEFINED := -1
+	declare const UI_HEIGHT_PX := 110
+	declare const DEBUG_MODE := FALSE
+	declare const LABEL_FONT_WHITE := 17
+	declare const LABEL_FONT_BLACK := 16
+	declare const LABEL_FONT_SMALL := 12
+	declare const ALIGN_LEFT := 0
+	declare const ALIGN_CENTER := 1
+	declare const ALIGN_RIGHT := 2
+	declare const TS_TOGGLE_BUTTON_FONT_OFF := 24
+	declare const TS_TOGGLE_BUTTON_FONT_ON := 22
+
+
+	{------------------------INITIALIZATION------------------------}
+	SET_CONDITION(NO_SYS_SCRIPT_RLS_TRIG) {Disable built-in release trigger handling}
+	set_ui_height_px(UI_HEIGHT_PX)
+	set_script_title(SCRIPT_TITLE)
+	make_perfview()
+	message("")
+
+	{------------------------GUI------------------------}
+	MakeLabel(la_keyswitch, 200, UI_HEIGHT_PX - 30, 60, 5, "KEYSWITCH")
+	SetFont(la_keyswitch, LABEL_FONT_BLACK)
+	AlignText(la_keyswitch, ALIGN_CENTER)
+
+	MakeLabel(la_double, 50, 20, 60, 31, "Double")
+	SetFont(la_double, LABEL_FONT_WHITE)
+	AlignText(la_double, ALIGN_CENTER)
+	hide_part(la_double, HIDE_PART_BG)
+
+	MakeLabel(la_triple, 50, 20, 60, 61, "Triple")
+	SetFont(la_triple, LABEL_FONT_WHITE)
+	AlignText(la_triple, ALIGN_CENTER)
+	hide_part(la_triple, HIDE_PART_BG)
+
+	MakeValueEdit(va_double_keyswitch, 70, 20, 115,  30, 0, 127, 1, 21, "Note #")
+	make_persistent(va_double_keyswitch)
+
+	MakeValueEdit(va_triple_keyswitch, 70, 20, 115,  60, 0, 127, 1, 22, "Note #")
+	make_persistent(va_triple_keyswitch)
+	
+	MakeToggleButton(tb_double_learn_keyswitch, 55, 18, 197, 30, "Learn")
+	AlignText(tb_double_learn_keyswitch, ALIGN_CENTER)
+
+	MakeToggleButton(tb_triple_learn_keyswitch, 55, 18, 197, 60, "Learn")
+	AlignText(tb_triple_learn_keyswitch, ALIGN_CENTER)	
+
+	MakeLabel(la_note_duration, 125, UI_HEIGHT_PX - 30, 275, 5, "NOTE DURATION")
+	SetFont(la_note_duration, LABEL_FONT_BLACK)
+	AlignText(la_note_duration, ALIGN_CENTER)
+	MakeValueEdit(va_note_duration, 75, 18, 300, 45, 1, 1000, 1, 50, "ms")
+	make_persistent(va_note_duration)
+
+	MakeLabel(la_velocity_difference, 150, UI_HEIGHT_PX - 30, 416, 5, "VELOCITY DIFFERENCE")
+	SetFont(la_velocity_difference, LABEL_FONT_BLACK)
+	AlignText(la_velocity_difference, ALIGN_CENTER)
+	MakeValueEdit(va_velocity_diff, 75, 18, 455, 45, -127, 127, 1, -5, "delta")
+	make_persistent(va_velocity_diff)
+
+	{version}
+	MakeLabel(la_version, 300, 18, 60, UI_HEIGHT_PX - 20, SCRIPT_TITLE & " v" & VERSION_NUM & " - www.tobysherriff.net")
+	SetFont(la_version, LABEL_FONT_SMALL)
+	hide_part(la_version, HIDE_PART_BG)
+
+	{------------------------SETUP------------------------}
+	declare double_learn_mode_on := FALSE
+	declare triple_learn_mode_on := FALSE
+	declare last_velocity[127]
+	declare last_noteon_timestamp[127]
+	declare multi_tongue_velocity := 0
+	declare double_tongue_active := FALSE
+	declare triple_tongue_active := FALSE
+	declare time_between_notes := 0
+
+end on
+
+OnTSToggleButton(tb_double_learn_keyswitch)
+	if (tb_double_learn_keyswitch = TRUE)
+		set_text(tb_double_learn_keyswitch, "Learning")
+		double_learn_mode_on := TRUE		
+	else
+		set_text(tb_double_learn_keyswitch, "Learn")
+		double_learn_mode_on := FALSE
+		double_tongue_active := FALSE
+	end if
+EndOnTSToggleButton()
+
+OnTSToggleButton(tb_triple_learn_keyswitch)
+	if (tb_triple_learn_keyswitch = TRUE)
+		set_text(tb_triple_learn_keyswitch, "Learning")
+		triple_learn_mode_on := TRUE
+	else
+		set_text(tb_triple_learn_keyswitch, "Learn")
+		triple_learn_mode_on := FALSE
+		triple_tongue_active := FALSE
+	end if
+EndOnTSToggleButton()
+
+{**********Macros**********}
+macro MakeControlBase(#name#, #width#, #height#, #xpos#, #ypos#)
+	declare #name#_index
+	#name#->width := #width#
+	#name#->height := #height#
+	#name#->x := #xpos#
+	#name#->y := #ypos#
+end macro
+
+macro MakeLabel(#name#, #width#, #height#, #xpos#, #ypos#, #text#)
+	declare ui_label #name#(1, 1)
+	MakeControlBase(#name#, #width#, #height#, #xpos#, #ypos#)
+	set_text(#name#, #text#)
+end macro
+
+macro MakeValueEdit(#name#, #width#, #height#, #xpos#, #ypos#, #min#, #max#, #ratio#, #default#, #text#)
+	declare ui_value_edit #name#(#min#, #max#, #ratio#)
+	MakeControlBase(#name#, #width#, #height#, #xpos#, #ypos#)
+	#name# := #default#
+	set_text(#name#, #text#)
+end macro
+
+macro MakeToggleButton(#name#, #width#, #height#, #xpos#, #ypos#, #text#)
+	declare ui_switch #name#
+	MakeControlBase(#name#, #width#, #height#, #xpos#, #ypos#)
+	set_text(#name#, #text#)
+end macro
+
+macro SetFont(#control#, #font#)
+	set_control_par(#control#, CONTROL_PAR_FONT_TYPE, #font#)
+end macro
+
+macro AlignText(#control#, #alignment#)
+	set_control_par(#control#, CONTROL_PAR_TEXT_ALIGNMENT, #alignment#)
+end macro
+
+on ui_control(va_double_keyswitch)
+	double_tongue_active := FALSE
+end on
+
+on ui_control(va_triple_keyswitch)
+	triple_tongue_active := FALSE
+end on
+
+macro OnTSToggleButton(#control#)
+	on ui_control(#control#)
+		call #control#_handler()
+	end on
+	function #control#_handler()
+		if (#control# = TRUE)
+			SetFont(#control#, TS_TOGGLE_BUTTON_FONT_ON)
+		else
+			SetFont(#control#, TS_TOGGLE_BUTTON_FONT_OFF)
+		end if
+end macro
+
+macro EndOnTSToggleButton()
+	end function
+end macro
+
+macro CreateVersionNumber(#varname#)
+
+	declare @VERSION_MAJOR
+	declare @VERSION_MINOR
+	declare @BUILD
+
+	VERSION_MAJOR := "1"
+	VERSION_MINOR := "0"
+	BUILD := "0"
+
+	declare @#varname#
+	#varname# := VERSION_MAJOR & "." & VERSION_MINOR & "." & BUILD
+end macro
+
+{**********midi_in**********}
+on midi_in
+
+	{NOTE ON}
+	if (MIDI_COMMAND = MIDI_COMMAND_NOTE_ON and MIDI_BYTE_2 > 0) 	
+		
+		if (double_learn_mode_on = TRUE) {LEARN DOUBLE KEYSWITCH}
+			ignore_midi
+			va_double_keyswitch := $MIDI_BYTE_1
+			tb_double_learn_keyswitch := FALSE
+			tb_double_learn_keyswitch_handler()			
+		end if
+
+		if (triple_learn_mode_on = TRUE) {LEARN DOUBLE KEYSWITCH}
+			ignore_midi
+			va_triple_keyswitch := $MIDI_BYTE_1
+			tb_triple_learn_keyswitch := FALSE
+			tb_triple_learn_keyswitch_handler()			
+		end if
+
+		last_velocity[MIDI_BYTE_1] := MIDI_BYTE_2 {Store the last velocity of each note}
+		last_noteon_timestamp[MIDI_BYTE_1] := ENGINE_UPTIME {Store the timestamp of each note on}
+
+		if (MIDI_BYTE_1 = va_double_keyswitch) {Turn on double tongue mode if this is the double tongue keyswitch}
+			double_tongue_active := TRUE
+		else if (MIDI_BYTE_1 = va_triple_keyswitch) {Turn on triple tongue mode if this is the triple tongue keyswitch}
+			triple_tongue_active := TRUE
+		else if (double_tongue_active = TRUE or triple_tongue_active = TRUE)
+			wait(va_note_duration * 1000) {convert to us}
+			set_midi(MIDI_CHANNEL, $MIDI_COMMAND_NOTE_ON, MIDI_BYTE_1, 0)
+		end if		
+
+	{NOTE_OFF}
+	else if (MIDI_COMMAND = $MIDI_COMMAND_NOTE_OFF or (MIDI_COMMAND = MIDI_COMMAND_NOTE_ON and MIDI_BYTE_2 = 0))
+
+		if (MIDI_BYTE_1 = va_double_keyswitch) {Turn off the double tongue mode if this is the double tongue keyswitch}
+			double_tongue_active := FALSE
+
+		end if
+		
+		if (MIDI_BYTE_1 = va_triple_keyswitch) {Turn off the triple tongue mode if this is the triple tongue keyswitch}
+			double_tongue_active := FALSE
+		end if
+
+		if ((MIDI_BYTE_1 # va_double_keyswitch) and (MIDI_BYTE_1 # va_triple_keyswitch))
+
+			{Calculate the time between the first and second note, and the extra notes' velocities}
+			time_between_notes := ENGINE_UPTIME - last_noteon_timestamp[MIDI_BYTE_1]
+
+			{Only process a multi-tongue note on release if the time between notes is les than a second}
+			if (time_between_notes < 1000)
+
+				multi_tongue_velocity := last_velocity[MIDI_BYTE_1] + va_velocity_diff
+				if (multi_tongue_velocity > 127)
+					multi_tongue_velocity := 127
+				else if (multi_tongue_velocity < 1)
+					multi_tongue_velocity := 1
+				end if
+
+				if (double_tongue_active = TRUE) 
+
+					{DOUBLE TONGUE GO!}
+
+					ignore_midi
+					set_midi(MIDI_CHANNEL, $MIDI_COMMAND_NOTE_ON, MIDI_BYTE_1, multi_tongue_velocity)
+					wait(va_note_duration * 1000) {convert to us}
+					set_midi(MIDI_CHANNEL, $MIDI_COMMAND_NOTE_ON, MIDI_BYTE_1, 0)
+
+				else if (triple_tongue_active = TRUE)
+
+					{TRIPLE TONGUE GO!}
+					ignore_midi
+					set_midi(MIDI_CHANNEL, $MIDI_COMMAND_NOTE_ON, MIDI_BYTE_1, multi_tongue_velocity)
+					wait(va_note_duration * 1000) {convert to us}
+					set_midi(MIDI_CHANNEL, $MIDI_COMMAND_NOTE_ON, MIDI_BYTE_1, 0)
+					wait(time_between_notes * 1000)
+					set_midi(MIDI_CHANNEL, $MIDI_COMMAND_NOTE_ON, MIDI_BYTE_1, multi_tongue_velocity)
+					wait(va_note_duration * 1000) {convert to us}
+					set_midi(MIDI_CHANNEL, $MIDI_COMMAND_NOTE_ON, MIDI_BYTE_1, 0)
+
+				end if
+
+			end if
+
+		end if
+
+	end if	
+end on
