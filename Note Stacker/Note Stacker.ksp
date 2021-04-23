@@ -4,10 +4,15 @@
 	Two different intervals are supported, depending on the CC value.
 
 Changelog:
+	v1.2 - Added MIDI note range filter
+	v1.1 - Fixed an issue where the original note on/off message was being duplicated
 	v1.0 - Initial implimentation
 }
 
-{ #pragma save_compiled_source note_stacker_v1.0_compiled.txt }
+{ #pragma save_compiled_source note_stacker_compiled.txt }
+
+	define VERSION_MAJOR := "1"
+	define VERSION_MINOR := "2"
 
 on init
 
@@ -46,23 +51,32 @@ on init
 	AlignText(la_A_text, ALIGN_CENTER)
 	hide_part(la_A_text, HIDE_PART_BG)
 
-	MakeLabel(la_B_text, 200, 20, 400, 5, "INTERVAL B")
+	MakeLabel(la_B_text, 200, 20, 350, 5, "INTERVAL B")
 	SetFont(la_B_text, LABEL_FONT_BLACK)
 	AlignText(la_B_text, ALIGN_CENTER)
 	hide_part(la_B_text, HIDE_PART_BG)
 
+	MakeLabel(la_ignore_below_text, 200, 20, 450, 5, "IGNORE NOTES")
+	SetFont(la_ignore_below_text, LABEL_FONT_BLACK)
+	AlignText(la_ignore_below_text, ALIGN_CENTER)
+	hide_part(la_ignore_below_text, HIDE_PART_BG)
+
 	{MakeValueEdit(ve_channel_num, 	110, 20, 100,  30, 0, 1,   	16, 	1, 50, "Channel #")}
-	MakeValueEdit(ve_cc_num, 		110, 20, 100,  45, 0,   	127, 	1, 58, "CC #")
-	MakeValueEdit(ve_A_cc_val, 		100, 20, 300, 30, 0, 	127, 	1, 47, "CC Value")
-	MakeValueEdit(ve_B_cc_val, 		100, 20, 450, 30, 0, 	127, 	1, 48, "CC Value")
+	MakeValueEdit(ve_cc_num, 		110, 20, 100,  45, 	0, 127, 	1, 58, "CC #")
+	MakeValueEdit(ve_A_cc_val, 		100, 20, 300, 30, 	0, 127, 	1, 47, "CC Value")
+	MakeValueEdit(ve_B_cc_val, 		100, 20, 400, 30, 	0, 127, 	1, 48, "CC Value")
 	MakeValueEdit(ve_A_interval, 	100, 20, 300, 60, -12, 	12, 	1, 1, "Interval")
-	MakeValueEdit(ve_B_interval, 	100, 20, 450, 60, -12, 	12, 	1, 2, "Interval")
+	MakeValueEdit(ve_B_interval, 	100, 20, 400, 60, -12, 	12, 	1, 2, "Interval")
+	MakeValueEdit(ve_ignore_below, 	100, 20, 500, 30, 	0, 127, 	1, 0, "< = Note #")
+	MakeValueEdit(ve_ignore_above, 	100, 20, 500, 60, 	0, 127, 	1, 127, "> = Note #")
 	{make_persistent(ve_channel_num)}
 	make_persistent(ve_cc_num)
 	make_persistent(ve_A_cc_val)
 	make_persistent(ve_B_cc_val)
 	make_persistent(ve_A_interval)
 	make_persistent(ve_B_interval)
+	make_persistent(ve_ignore_below)
+	make_persistent(ve_ignore_above)
 
 	MakeLabel(la_version, 200, 18, 60, UI_HEIGHT_PX - 20, SCRIPT_TITLE & " v" & VERSION_NUM)
 	SetFont(la_version, LABEL_FONT_SMALL)
@@ -129,17 +143,8 @@ macro EndOnValueEdit()
 end macro
 
 macro CreateVersionNumber(#varname#)
-
-	declare @VERSION_MAJOR
-	declare @VERSION_MINOR
-	declare @BUILD
-
-	VERSION_MAJOR := "1"
-	VERSION_MINOR := "0"
-	BUILD := "0"
-
 	declare @#varname#
-	#varname# := "v" & VERSION_MAJOR & "." & VERSION_MINOR & "." & BUILD
+	#varname# := VERSION_MAJOR & "." & VERSION_MINOR
 end macro
 
 macro MakeLabel(#name#, #width#, #height#, #xpos#, #ypos#, #text#)
@@ -179,6 +184,11 @@ on midi_in
 		exit
 	end if}
 
+	//Ignore notes that are out of range
+	if (($MIDI_COMMAND = $MIDI_COMMAND_NOTE_ON or $MIDI_COMMAND = $MIDI_COMMAND_NOTE_OFF) and ($MIDI_BYTE_1 < $ve_ignore_below or $MIDI_BYTE_1 > $ve_ignore_above))
+		exit()
+	end if
+
 	{Is this in A stack or B stack?}
 	if (CC[ve_cc_num] = ve_A_cc_val) {A STACK}
 
@@ -186,6 +196,7 @@ on midi_in
 		if ($MIDI_COMMAND = $MIDI_COMMAND_NOTE_ON and $MIDI_BYTE_2 > 0) 	
 			stop_stack_note(0, $MIDI_CHANNEL)
 			start_stack_note(0, $MIDI_BYTE_1, $MIDI_BYTE_2, $MIDI_CHANNEL)
+			ignore_midi
  		end if 		
 
  	else if (CC[ve_cc_num] = ve_B_cc_val) {B STACK}
@@ -194,6 +205,7 @@ on midi_in
 		if ($MIDI_COMMAND = $MIDI_COMMAND_NOTE_ON and $MIDI_BYTE_2 > 0) 	
 			stop_stack_note(1, $MIDI_CHANNEL)
 			start_stack_note(1, $MIDI_BYTE_1, $MIDI_BYTE_2, $MIDI_CHANNEL)
+			ignore_midi
  		end if
 
 	end if
@@ -202,9 +214,11 @@ on midi_in
 	if ($MIDI_COMMAND = $MIDI_COMMAND_NOTE_OFF or ($MIDI_COMMAND = $MIDI_COMMAND_NOTE_ON and $MIDI_BYTE_2 = 0)) {NOTE OFF}
 		if ($MIDI_BYTE_1 = last_A_note_num[$MIDI_CHANNEL])
 			stop_stack_note(0, $MIDI_CHANNEL)
+			ignore_midi
 		end if
 		if ($MIDI_BYTE_1 = last_B_note_num[$MIDI_CHANNEL])
 			stop_stack_note(1, $MIDI_CHANNEL)
+			ignore_midi
 		end if 		
  	end if	
 end on

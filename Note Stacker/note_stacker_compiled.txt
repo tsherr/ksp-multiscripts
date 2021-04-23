@@ -1,13 +1,7 @@
-{ Compiled on Wed Apr 25 23:14:57 2018 }
+{ Compiled on Fri Apr 23 13:23:21 2021 }
 on init
-declare @VERSION_MAJOR
-declare @VERSION_MINOR
-declare @BUILD
-@VERSION_MAJOR := "1"
-@VERSION_MINOR := "0"
-@BUILD := "0"
 declare @VERSION_NUM
-@VERSION_NUM := "v" & @VERSION_MAJOR & "." & @VERSION_MINOR & "." & @BUILD
+@VERSION_NUM := "1" & "." & "2"
 declare @SCRIPT_TITLE
 @SCRIPT_TITLE := "Note Stacker"
 SET_CONDITION(NO_SYS_SCRIPT_RLS_TRIG)
@@ -41,12 +35,21 @@ hide_part($la_A_text,$HIDE_PART_BG)
 declare ui_label $la_B_text(1, 1) 
 set_control_par(get_ui_id($la_B_text),$CONTROL_PAR_WIDTH,200)
 set_control_par(get_ui_id($la_B_text),$CONTROL_PAR_HEIGHT,20)
-set_control_par(get_ui_id($la_B_text),$CONTROL_PAR_POS_X,400)
+set_control_par(get_ui_id($la_B_text),$CONTROL_PAR_POS_X,350)
 set_control_par(get_ui_id($la_B_text),$CONTROL_PAR_POS_Y,5)
 set_text($la_B_text,"INTERVAL B")
 set_control_par(get_ui_id($la_B_text),$CONTROL_PAR_FONT_TYPE,16)
 set_control_par(get_ui_id($la_B_text),$CONTROL_PAR_TEXT_ALIGNMENT,1)
 hide_part($la_B_text,$HIDE_PART_BG)
+declare ui_label $la_ignore_below_text(1, 1) 
+set_control_par(get_ui_id($la_ignore_below_text),$CONTROL_PAR_WIDTH,200)
+set_control_par(get_ui_id($la_ignore_below_text),$CONTROL_PAR_HEIGHT,20)
+set_control_par(get_ui_id($la_ignore_below_text),$CONTROL_PAR_POS_X,450)
+set_control_par(get_ui_id($la_ignore_below_text),$CONTROL_PAR_POS_Y,5)
+set_text($la_ignore_below_text,"IGNORE NOTES")
+set_control_par(get_ui_id($la_ignore_below_text),$CONTROL_PAR_FONT_TYPE,16)
+set_control_par(get_ui_id($la_ignore_below_text),$CONTROL_PAR_TEXT_ALIGNMENT,1)
+hide_part($la_ignore_below_text,$HIDE_PART_BG)
 declare ui_value_edit $ve_cc_num(0, 127, 1) 
 set_control_par(get_ui_id($ve_cc_num),$CONTROL_PAR_WIDTH,110)
 set_control_par(get_ui_id($ve_cc_num),$CONTROL_PAR_HEIGHT,20)
@@ -64,7 +67,7 @@ set_text($ve_A_cc_val,"CC Value")
 declare ui_value_edit $ve_B_cc_val(0, 127, 1) 
 set_control_par(get_ui_id($ve_B_cc_val),$CONTROL_PAR_WIDTH,100)
 set_control_par(get_ui_id($ve_B_cc_val),$CONTROL_PAR_HEIGHT,20)
-set_control_par(get_ui_id($ve_B_cc_val),$CONTROL_PAR_POS_X,450)
+set_control_par(get_ui_id($ve_B_cc_val),$CONTROL_PAR_POS_X,400)
 set_control_par(get_ui_id($ve_B_cc_val),$CONTROL_PAR_POS_Y,30)
 $ve_B_cc_val := 48
 set_text($ve_B_cc_val,"CC Value")
@@ -78,15 +81,31 @@ set_text($ve_A_interval,"Interval")
 declare ui_value_edit $ve_B_interval(-12, 12, 1) 
 set_control_par(get_ui_id($ve_B_interval),$CONTROL_PAR_WIDTH,100)
 set_control_par(get_ui_id($ve_B_interval),$CONTROL_PAR_HEIGHT,20)
-set_control_par(get_ui_id($ve_B_interval),$CONTROL_PAR_POS_X,450)
+set_control_par(get_ui_id($ve_B_interval),$CONTROL_PAR_POS_X,400)
 set_control_par(get_ui_id($ve_B_interval),$CONTROL_PAR_POS_Y,60)
 $ve_B_interval := 2
 set_text($ve_B_interval,"Interval")
+declare ui_value_edit $ve_ignore_below(0, 127, 1) 
+set_control_par(get_ui_id($ve_ignore_below),$CONTROL_PAR_WIDTH,100)
+set_control_par(get_ui_id($ve_ignore_below),$CONTROL_PAR_HEIGHT,20)
+set_control_par(get_ui_id($ve_ignore_below),$CONTROL_PAR_POS_X,500)
+set_control_par(get_ui_id($ve_ignore_below),$CONTROL_PAR_POS_Y,30)
+$ve_ignore_below := 0
+set_text($ve_ignore_below,"< = Note #")
+declare ui_value_edit $ve_ignore_above(0, 127, 1) 
+set_control_par(get_ui_id($ve_ignore_above),$CONTROL_PAR_WIDTH,100)
+set_control_par(get_ui_id($ve_ignore_above),$CONTROL_PAR_HEIGHT,20)
+set_control_par(get_ui_id($ve_ignore_above),$CONTROL_PAR_POS_X,500)
+set_control_par(get_ui_id($ve_ignore_above),$CONTROL_PAR_POS_Y,60)
+$ve_ignore_above := 127
+set_text($ve_ignore_above,"> = Note #")
 make_persistent($ve_cc_num)
 make_persistent($ve_A_cc_val)
 make_persistent($ve_B_cc_val)
 make_persistent($ve_A_interval)
 make_persistent($ve_B_interval)
+make_persistent($ve_ignore_below)
+make_persistent($ve_ignore_above)
 declare ui_label $la_version(1, 1) 
 set_control_par(get_ui_id($la_version),$CONTROL_PAR_WIDTH,200)
 set_control_par(get_ui_id($la_version),$CONTROL_PAR_HEIGHT,18)
@@ -105,6 +124,9 @@ set_text($ve_A_cc_val,"CC " & $ve_cc_num & " Value")
 set_text($ve_B_cc_val,"CC " & $ve_cc_num & " Value")
 end function
 on midi_in
+if (($MIDI_COMMAND=$MIDI_COMMAND_NOTE_ON or ($MIDI_COMMAND=$MIDI_COMMAND_NOTE_OFF)) and ($MIDI_BYTE_1<$ve_ignore_below or ($MIDI_BYTE_1>$ve_ignore_above)))
+exit
+end if
 if (%CC[$ve_cc_num]=$ve_A_cc_val)
 if ($MIDI_COMMAND=$MIDI_COMMAND_NOTE_ON and ($MIDI_BYTE_2>0))
 if (%last_A_note_num[$MIDI_CHANNEL]>=0)
@@ -115,6 +137,7 @@ end if
 set_midi($MIDI_CHANNEL,$MIDI_COMMAND_NOTE_ON,$MIDI_BYTE_1,$MIDI_BYTE_2)
 set_midi($MIDI_CHANNEL,$MIDI_COMMAND_NOTE_ON,$MIDI_BYTE_1+$ve_A_interval,$MIDI_BYTE_2)
 %last_A_note_num[$MIDI_CHANNEL] := $MIDI_BYTE_1
+ignore_midi
 end if
 else
 if (%CC[$ve_cc_num]=$ve_B_cc_val)
@@ -131,6 +154,7 @@ set_midi($MIDI_CHANNEL,$MIDI_COMMAND_NOTE_ON,$MIDI_BYTE_1,$MIDI_BYTE_2)
 set_midi($MIDI_CHANNEL,$MIDI_COMMAND_NOTE_ON,$MIDI_BYTE_1+$ve_B_interval,$MIDI_BYTE_2)
 %last_B_note_num[$MIDI_CHANNEL] := $MIDI_BYTE_1
 end if
+ignore_midi
 end if
 end if
 end if
@@ -141,6 +165,7 @@ set_midi($MIDI_CHANNEL,$MIDI_COMMAND_NOTE_ON,%last_A_note_num[$MIDI_CHANNEL],0)
 set_midi($MIDI_CHANNEL,$MIDI_COMMAND_NOTE_ON,%last_A_note_num[$MIDI_CHANNEL]+$ve_A_interval,0)
 %last_A_note_num[$MIDI_CHANNEL] := -1
 end if
+ignore_midi
 end if
 if ($MIDI_BYTE_1=%last_B_note_num[$MIDI_CHANNEL])
 if (1=1)
@@ -150,6 +175,7 @@ set_midi($MIDI_CHANNEL,$MIDI_COMMAND_NOTE_ON,%last_B_note_num[$MIDI_CHANNEL]+$ve
 %last_B_note_num[$MIDI_CHANNEL] := -1
 end if
 end if
+ignore_midi
 end if
 end if
 end on
