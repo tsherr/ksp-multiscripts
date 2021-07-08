@@ -1,0 +1,120 @@
+//Niente Compensation
+
+define VERSION_NUM := "1.0"
+
+define TRUE := 1
+define FALSE := 0
+define NUM_CHANNELS := 16
+
+on init
+
+	{#pragma save_compiled_source niente_compensation_compiled.ksp}
+	
+	declare i
+	
+	declare pers IsActive[NUM_CHANNELS]
+	declare pers DynCCNum[NUM_CHANNELS]
+	declare pers ExpCCNum[NUM_CHANNELS]
+	declare pers ExpDefault[NUM_CHANNELS]
+	declare pers SplitPoint[NUM_CHANNELS]	
+	declare pers ?AttenFactor[NUM_CHANNELS] := (1.0)
+
+	set_script_title("Niente comp " & VERSION_NUM)
+
+	declare pers ui_menu me_Channels
+	for i := 0 to NUM_CHANNELS - 1
+		add_menu_item(me_Channels, "Channel " & i + 1, i)
+	end for	
+	me_Channels -> width := 100	
+	me_Channels -> x := 60
+	me_Channels -> y := 5
+
+	declare pers ui_button bu_IsActive
+	bu_IsActive -> text := "Active"	
+	bu_IsActive -> width := 100	
+	bu_IsActive -> x := 60
+	bu_IsActive -> y := 25
+
+	declare pers ui_value_edit va_DynCCNum(1, 127, 1)
+	va_DynCCNum -> text := "Dyn CC"
+	va_DynCCNum -> width := 100
+	va_DynCCNum -> x := 200
+	va_DynCCNum -> y := 5
+
+	declare pers ui_value_edit va_ExpCCNum(1, 127, 1)
+	va_ExpCCNum -> text := "Exp CC"
+	va_ExpCCNum -> width := 100
+	va_ExpCCNum -> x := 200
+	va_ExpCCNum -> y := 25
+
+	declare pers ui_value_edit va_ExpDefault(1, 127, 1)
+	va_ExpDefault -> text := "Exp Def."
+	va_ExpDefault -> width := 100
+	va_ExpDefault -> x := 310
+	va_ExpDefault -> y := 5
+
+	declare pers ui_value_edit va_SplitPoint(1, 127, 1)
+	va_SplitPoint -> text := "Split"
+	va_SplitPoint -> width := 100
+	va_SplitPoint -> x := 310
+	va_SplitPoint -> y := 25
+
+	declare pers ui_value_edit va_AttenFactor(0, 1000, 100)
+	va_AttenFactor -> text := "Atten X"
+	va_AttenFactor -> width := 100
+	va_AttenFactor -> x := 420
+	va_AttenFactor -> y := 5
+
+end on
+
+on ui_control(me_Channels)
+	bu_IsActive := IsActive[me_Channels -> value]
+	va_DynCCNum := DynCCNum[me_Channels -> value]
+	va_ExpCCNum := ExpCCNum[me_Channels -> value]
+	va_ExpDefault := ExpDefault[me_Channels -> value]
+	va_SplitPoint := SplitPoint[me_Channels -> value]
+	va_AttenFactor := real_to_int(AttenFactor[me_Channels -> value] * 100.0)
+end on
+
+on ui_control(bu_IsActive)
+	IsActive[me_Channels -> value] := bu_IsActive
+end on
+
+on ui_control(va_DynCCNum)
+	DynCCNum[me_Channels -> value] := va_DynCCNum
+end on
+
+on ui_control(va_ExpCCNum)
+	ExpCCNum[me_Channels -> value] := va_ExpCCNum
+end on
+
+on ui_control(va_ExpDefault)
+	ExpDefault[me_Channels -> value] := va_ExpDefault
+end on
+
+on ui_control(va_SplitPoint)
+	SplitPoint[me_Channels -> value] := va_SplitPoint
+end on
+
+on ui_control(va_AttenFactor)
+	AttenFactor[me_Channels -> value] := int_to_real(va_AttenFactor) / 100.0	
+end on
+
+
+on midi_in
+	
+	if (IsActive[MIDI_CHANNEL] = 1)
+
+		if (MIDI_COMMAND = MIDI_COMMAND_CC and MIDI_BYTE_1 = ExpCCNum[MIDI_CHANNEL])
+			ignore_midi
+		else
+			if (MIDI_COMMAND = MIDI_COMMAND_CC and MIDI_BYTE_1 = DynCCNum[MIDI_CHANNEL])
+				if (MIDI_BYTE_2 < SplitPoint[MIDI_CHANNEL])
+					set_midi(MIDI_CHANNEL, MIDI_COMMAND_CC, ExpCCNum[MIDI_CHANNEL], ExpDefault[MIDI_CHANNEL] - real_to_int(int_to_real((SplitPoint[MIDI_CHANNEL] - MIDI_BYTE_2)) / ?AttenFactor[MIDI_CHANNEL]))
+				else
+					set_midi(MIDI_CHANNEL, MIDI_COMMAND_CC, ExpCCNum[MIDI_CHANNEL], ExpDefault[MIDI_CHANNEL])
+				end if
+			end if
+		end if
+	end if
+end on

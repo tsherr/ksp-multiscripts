@@ -1,0 +1,109 @@
+{ Compiled on Fri Apr 23 11:52:23 2021 }
+on init
+declare $concat_it
+declare $concat_offset
+declare $string_it
+declare $list_it
+declare $preproc_i
+declare $i
+declare %IsActive[16]
+make_persistent(%IsActive)
+declare %DynCCNum[16]
+make_persistent(%DynCCNum)
+declare %ExpCCNum[16]
+make_persistent(%ExpCCNum)
+declare %ExpDefault[16]
+make_persistent(%ExpDefault)
+declare %SplitPoint[16]
+make_persistent(%SplitPoint)
+declare ?AttenFactor[16] := (1.0)
+make_persistent(?AttenFactor)
+set_script_title("Niente comp " & "1.0")
+declare ui_menu $me_Channels
+make_persistent($me_Channels)
+$i := 0
+while ($i<16)
+add_menu_item($me_Channels,"Channel " & ($i+1),$i)
+inc($i)
+end while
+set_control_par(get_ui_id($me_Channels),$CONTROL_PAR_WIDTH,100)
+set_control_par(get_ui_id($me_Channels),$CONTROL_PAR_POS_X,60)
+set_control_par(get_ui_id($me_Channels),$CONTROL_PAR_POS_Y,5)
+declare ui_button $bu_IsActive
+make_persistent($bu_IsActive)
+set_control_par_str(get_ui_id($bu_IsActive),$CONTROL_PAR_TEXT,"Active")
+set_control_par(get_ui_id($bu_IsActive),$CONTROL_PAR_WIDTH,100)
+set_control_par(get_ui_id($bu_IsActive),$CONTROL_PAR_POS_X,60)
+set_control_par(get_ui_id($bu_IsActive),$CONTROL_PAR_POS_Y,25)
+declare ui_value_edit $va_DynCCNum(1, 127, 1) 
+make_persistent($va_DynCCNum)
+set_control_par_str(get_ui_id($va_DynCCNum),$CONTROL_PAR_TEXT,"Dyn CC")
+set_control_par(get_ui_id($va_DynCCNum),$CONTROL_PAR_WIDTH,100)
+set_control_par(get_ui_id($va_DynCCNum),$CONTROL_PAR_POS_X,200)
+set_control_par(get_ui_id($va_DynCCNum),$CONTROL_PAR_POS_Y,5)
+declare ui_value_edit $va_ExpCCNum(1, 127, 1) 
+make_persistent($va_ExpCCNum)
+set_control_par_str(get_ui_id($va_ExpCCNum),$CONTROL_PAR_TEXT,"Exp CC")
+set_control_par(get_ui_id($va_ExpCCNum),$CONTROL_PAR_WIDTH,100)
+set_control_par(get_ui_id($va_ExpCCNum),$CONTROL_PAR_POS_X,200)
+set_control_par(get_ui_id($va_ExpCCNum),$CONTROL_PAR_POS_Y,25)
+declare ui_value_edit $va_ExpDefault(1, 127, 1) 
+make_persistent($va_ExpDefault)
+set_control_par_str(get_ui_id($va_ExpDefault),$CONTROL_PAR_TEXT,"Exp Def.")
+set_control_par(get_ui_id($va_ExpDefault),$CONTROL_PAR_WIDTH,100)
+set_control_par(get_ui_id($va_ExpDefault),$CONTROL_PAR_POS_X,310)
+set_control_par(get_ui_id($va_ExpDefault),$CONTROL_PAR_POS_Y,5)
+declare ui_value_edit $va_SplitPoint(1, 127, 1) 
+make_persistent($va_SplitPoint)
+set_control_par_str(get_ui_id($va_SplitPoint),$CONTROL_PAR_TEXT,"Split")
+set_control_par(get_ui_id($va_SplitPoint),$CONTROL_PAR_WIDTH,100)
+set_control_par(get_ui_id($va_SplitPoint),$CONTROL_PAR_POS_X,310)
+set_control_par(get_ui_id($va_SplitPoint),$CONTROL_PAR_POS_Y,25)
+declare ui_value_edit $va_AttenFactor(0, 1000, 100) 
+make_persistent($va_AttenFactor)
+set_control_par_str(get_ui_id($va_AttenFactor),$CONTROL_PAR_TEXT,"Atten X")
+set_control_par(get_ui_id($va_AttenFactor),$CONTROL_PAR_WIDTH,100)
+set_control_par(get_ui_id($va_AttenFactor),$CONTROL_PAR_POS_X,420)
+set_control_par(get_ui_id($va_AttenFactor),$CONTROL_PAR_POS_Y,5)
+end on
+on ui_control($me_Channels)
+$bu_IsActive := %IsActive[get_control_par(get_ui_id($me_Channels),$CONTROL_PAR_VALUE)]
+$va_DynCCNum := %DynCCNum[get_control_par(get_ui_id($me_Channels),$CONTROL_PAR_VALUE)]
+$va_ExpCCNum := %ExpCCNum[get_control_par(get_ui_id($me_Channels),$CONTROL_PAR_VALUE)]
+$va_ExpDefault := %ExpDefault[get_control_par(get_ui_id($me_Channels),$CONTROL_PAR_VALUE)]
+$va_SplitPoint := %SplitPoint[get_control_par(get_ui_id($me_Channels),$CONTROL_PAR_VALUE)]
+$va_AttenFactor := real_to_int(?AttenFactor[get_control_par(get_ui_id($me_Channels),$CONTROL_PAR_VALUE)]*100.0)
+end on
+on ui_control($bu_IsActive)
+%IsActive[get_control_par(get_ui_id($me_Channels),$CONTROL_PAR_VALUE)] := $bu_IsActive
+end on
+on ui_control($va_DynCCNum)
+%DynCCNum[get_control_par(get_ui_id($me_Channels),$CONTROL_PAR_VALUE)] := $va_DynCCNum
+end on
+on ui_control($va_ExpCCNum)
+%ExpCCNum[get_control_par(get_ui_id($me_Channels),$CONTROL_PAR_VALUE)] := $va_ExpCCNum
+end on
+on ui_control($va_ExpDefault)
+%ExpDefault[get_control_par(get_ui_id($me_Channels),$CONTROL_PAR_VALUE)] := $va_ExpDefault
+end on
+on ui_control($va_SplitPoint)
+%SplitPoint[get_control_par(get_ui_id($me_Channels),$CONTROL_PAR_VALUE)] := $va_SplitPoint
+end on
+on ui_control($va_AttenFactor)
+?AttenFactor[get_control_par(get_ui_id($me_Channels),$CONTROL_PAR_VALUE)] := int_to_real($va_AttenFactor)/100.0
+end on
+on midi_in
+if (%IsActive[$MIDI_CHANNEL]=1)
+if ($MIDI_COMMAND=$MIDI_COMMAND_CC and ($MIDI_BYTE_1=%ExpCCNum[$MIDI_CHANNEL]))
+ignore_midi
+else
+if ($MIDI_COMMAND=$MIDI_COMMAND_CC and ($MIDI_BYTE_1=%DynCCNum[$MIDI_CHANNEL]))
+if ($MIDI_BYTE_2<%SplitPoint[$MIDI_CHANNEL])
+set_midi($MIDI_CHANNEL,$MIDI_COMMAND_CC,%ExpCCNum[$MIDI_CHANNEL],%ExpDefault[$MIDI_CHANNEL]-real_to_int(int_to_real(%SplitPoint[$MIDI_CHANNEL]-$MIDI_BYTE_2)/?AttenFactor[$MIDI_CHANNEL]))
+else
+set_midi($MIDI_CHANNEL,$MIDI_COMMAND_CC,%ExpCCNum[$MIDI_CHANNEL],%ExpDefault[$MIDI_CHANNEL])
+end if
+end if
+end if
+end if
+end on

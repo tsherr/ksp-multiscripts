@@ -1,0 +1,150 @@
+{ Compiled on Tue May  1 10:04:54 2018 }
+on init
+set_script_title("CSS DC FX" & " " & "v0.2")
+declare ui_label $la_Info(4, 4) 
+set_control_par_str(get_ui_id($la_Info),$CONTROL_PAR_TEXT,"This multi script fixes an issue with Cinematic Studio Strings in which dynamic layers can still be crossfaded even if no notes are playing. In the following box, indicate which CC to monitor for dynamics crossfade changes.")
+declare ui_label $la_ChannelSelect(1, 1) 
+set_control_par(get_ui_id($la_ChannelSelect),$CONTROL_PAR_POS_X,440)
+set_control_par(get_ui_id($la_ChannelSelect),$CONTROL_PAR_POS_Y,5)
+set_control_par(get_ui_id($la_ChannelSelect),$CONTROL_PAR_WIDTH,100)
+set_control_par_str(get_ui_id($la_ChannelSelect),$CONTROL_PAR_TEXT,"Channel: ")
+declare ui_menu $me_ChannelSelect
+set_control_par(get_ui_id($me_ChannelSelect),$CONTROL_PAR_POS_X,540)
+set_control_par(get_ui_id($me_ChannelSelect),$CONTROL_PAR_POS_Y,5)
+set_control_par(get_ui_id($me_ChannelSelect),$CONTROL_PAR_WIDTH,60)
+declare $i
+$i := 0
+while ($i<64)
+select ($i)
+case 0 to 15
+add_menu_item($me_ChannelSelect,"[A] " & ($i mod 16+1),$i)
+case 16 to 31
+add_menu_item($me_ChannelSelect,"[B] " & ($i mod 16+1),$i)
+case 32 to 47
+add_menu_item($me_ChannelSelect,"[C] " & ($i mod 16+1),$i)
+case 48 to 63
+add_menu_item($me_ChannelSelect,"[D] " & ($i mod 16+1),$i)
+end select
+inc($i)
+end while
+declare ui_value_edit $va_DynamicsCrossfadeCC(0, 127, 1) 
+make_persistent($va_DynamicsCrossfadeCC)
+set_control_par_str(get_ui_id($va_DynamicsCrossfadeCC),$CONTROL_PAR_TEXT,"Crossfade CC#")
+set_control_par(get_ui_id($va_DynamicsCrossfadeCC),$CONTROL_PAR_POS_X,440)
+set_control_par(get_ui_id($va_DynamicsCrossfadeCC),$CONTROL_PAR_POS_Y,25)
+set_control_par(get_ui_id($va_DynamicsCrossfadeCC),$CONTROL_PAR_WIDTH,160)
+declare ui_button $bu_DynamicsCrossfadeCCLearn
+set_control_par_str(get_ui_id($bu_DynamicsCrossfadeCCLearn),$CONTROL_PAR_TEXT,"Lrn")
+set_control_par(get_ui_id($bu_DynamicsCrossfadeCCLearn),$CONTROL_PAR_POS_X,get_control_par(get_ui_id($va_DynamicsCrossfadeCC),$CONTROL_PAR_POS_X)+get_control_par(get_ui_id($va_DynamicsCrossfadeCC),$CONTROL_PAR_WIDTH)+3)
+set_control_par(get_ui_id($bu_DynamicsCrossfadeCCLearn),$CONTROL_PAR_POS_Y,get_control_par(get_ui_id($va_DynamicsCrossfadeCC),$CONTROL_PAR_POS_Y))
+set_control_par(get_ui_id($bu_DynamicsCrossfadeCCLearn),$CONTROL_PAR_WIDTH,28)
+declare ui_value_edit $va_PlayingRangeLowKey(0, 127, 1) 
+make_persistent($va_PlayingRangeLowKey)
+set_control_par_str(get_ui_id($va_PlayingRangeLowKey),$CONTROL_PAR_TEXT,"Playing range low key")
+set_control_par(get_ui_id($va_PlayingRangeLowKey),$CONTROL_PAR_POS_X,440)
+set_control_par(get_ui_id($va_PlayingRangeLowKey),$CONTROL_PAR_POS_Y,45)
+set_control_par(get_ui_id($va_PlayingRangeLowKey),$CONTROL_PAR_WIDTH,160)
+declare ui_button $bu_PlayingRangeLowKeyLearn
+set_control_par_str(get_ui_id($bu_PlayingRangeLowKeyLearn),$CONTROL_PAR_TEXT,"Lrn")
+set_control_par(get_ui_id($bu_PlayingRangeLowKeyLearn),$CONTROL_PAR_POS_X,get_control_par(get_ui_id($va_PlayingRangeLowKey),$CONTROL_PAR_POS_X)+get_control_par(get_ui_id($va_PlayingRangeLowKey),$CONTROL_PAR_WIDTH)+3)
+set_control_par(get_ui_id($bu_PlayingRangeLowKeyLearn),$CONTROL_PAR_POS_Y,get_control_par(get_ui_id($va_PlayingRangeLowKey),$CONTROL_PAR_POS_Y))
+set_control_par(get_ui_id($bu_PlayingRangeLowKeyLearn),$CONTROL_PAR_WIDTH,28)
+declare ui_value_edit $va_PlayingRangeHighKey(0, 127, 1) 
+make_persistent($va_PlayingRangeHighKey)
+set_control_par_str(get_ui_id($va_PlayingRangeHighKey),$CONTROL_PAR_TEXT,"Playing range high key")
+set_control_par(get_ui_id($va_PlayingRangeHighKey),$CONTROL_PAR_POS_X,440)
+set_control_par(get_ui_id($va_PlayingRangeHighKey),$CONTROL_PAR_POS_Y,65)
+set_control_par(get_ui_id($va_PlayingRangeHighKey),$CONTROL_PAR_WIDTH,160)
+$va_PlayingRangeHighKey := 127
+declare ui_button $bu_PlayingRangehighKeyLearn
+set_control_par_str(get_ui_id($bu_PlayingRangehighKeyLearn),$CONTROL_PAR_TEXT,"Lrn")
+set_control_par(get_ui_id($bu_PlayingRangehighKeyLearn),$CONTROL_PAR_POS_X,get_control_par(get_ui_id($va_PlayingRangeHighKey),$CONTROL_PAR_POS_X)+get_control_par(get_ui_id($va_PlayingRangeHighKey),$CONTROL_PAR_WIDTH)+3)
+set_control_par(get_ui_id($bu_PlayingRangehighKeyLearn),$CONTROL_PAR_POS_Y,get_control_par(get_ui_id($va_PlayingRangeHighKey),$CONTROL_PAR_POS_Y))
+set_control_par(get_ui_id($bu_PlayingRangehighKeyLearn),$CONTROL_PAR_WIDTH,28)
+declare %dynamicsCrossfadeCCs[64]
+make_persistent(%dynamicsCrossfadeCCs)
+declare %playingRangeLowKey[64]
+make_persistent(%playingRangeLowKey)
+declare %playingRangeHighKey[64]
+make_persistent(%playingRangeHighKey)
+declare %lastDynamicsCrossfadeCCValue[64]
+make_persistent(%lastDynamicsCrossfadeCCValue)
+declare %keyCounter[64]
+declare $temp
+$i := 0
+while ($i<num_elements(%playingRangeHighKey))
+%playingRangeHighKey[$i] := 127
+inc($i)
+end while
+end on
+on ui_control($va_DynamicsCrossfadeCC)
+%dynamicsCrossfadeCCs[$me_ChannelSelect] := $va_DynamicsCrossfadeCC
+end on
+on ui_control($va_PlayingRangeLowKey)
+%playingRangeLowKey[$me_ChannelSelect] := $va_PlayingRangeLowKey
+end on
+on ui_control($va_PlayingRangeHighKey)
+%playingRangeHighKey[$me_ChannelSelect] := $va_PlayingRangeHighKey
+end on
+on ui_control($me_ChannelSelect)
+$va_DynamicsCrossfadeCC := %dynamicsCrossfadeCCs[$me_ChannelSelect]
+$va_PlayingRangeLowKey := %playingRangeLowKey[$me_ChannelSelect]
+$va_PlayingRangeHighKey := %playingRangeHighKey[$me_ChannelSelect]
+end on
+on midi_in
+if ($MIDI_COMMAND=$MIDI_COMMAND_CC and ($bu_DynamicsCrossfadeCCLearn=1))
+%dynamicsCrossfadeCCs[$me_ChannelSelect] := $MIDI_BYTE_1
+$va_DynamicsCrossfadeCC := $MIDI_BYTE_1
+$bu_DynamicsCrossfadeCCLearn := 0
+exit
+end if
+if ($MIDI_COMMAND=$MIDI_COMMAND_CC and ($MIDI_BYTE_1=%dynamicsCrossfadeCCs[$MIDI_CHANNEL]))
+%lastDynamicsCrossfadeCCValue[$MIDI_CHANNEL] := $MIDI_BYTE_2
+if (%keyCounter[$MIDI_CHANNEL]<0)
+%keyCounter[$MIDI_CHANNEL] := 0
+end if
+if (%keyCounter[$MIDI_CHANNEL]=0)
+$temp := 1
+else
+$temp := 0
+end if
+if ($temp=1)
+ignore_midi
+end if
+end if
+if ($MIDI_COMMAND=$MIDI_COMMAND_NOTE_ON and ($MIDI_BYTE_2>0))
+if ($bu_PlayingRangeLowKeyLearn=1)
+%playingRangeLowKey[$me_ChannelSelect] := $MIDI_BYTE_1
+$va_PlayingRangeLowKey := $MIDI_BYTE_1
+$bu_PlayingRangeLowKeyLearn := 0
+ignore_midi
+end if
+if ($bu_PlayingRangeHighKeyLearn=1)
+%playingRangeHighKey[$me_ChannelSelect] := $MIDI_BYTE_1
+$va_PlayingRangeHighKey := $MIDI_BYTE_1
+$bu_PlayingRangeHighKeyLearn := 0
+ignore_midi
+end if
+if ($MIDI_BYTE_1>=%playingRangeLowKey[$MIDI_CHANNEL] and ($MIDI_BYTE_1<=%playingRangeHighKey[$MIDI_CHANNEL]))
+if (%keyCounter[$MIDI_CHANNEL]<0)
+%keyCounter[$MIDI_CHANNEL] := 0
+end if
+if (%keyCounter[$MIDI_CHANNEL]=0)
+$temp := 1
+else
+$temp := 0
+end if
+if ($temp=1)
+ignore_midi
+set_midi($MIDI_CHANNEL,$MIDI_COMMAND_CC,%dynamicsCrossfadeCCs[$MIDI_CHANNEL],%lastDynamicsCrossfadeCCValue[$MIDI_CHANNEL])
+set_midi($MIDI_CHANNEL,$MIDI_COMMAND_NOTE_ON,$MIDI_BYTE_1,$MIDI_BYTE_2)
+end if
+%keyCounter[$MIDI_CHANNEL] := %keyCounter[$MIDI_CHANNEL]+1
+end if
+end if
+if ($MIDI_COMMAND=$MIDI_COMMAND_NOTE_OFF or ($MIDI_COMMAND=$MIDI_COMMAND_NOTE_ON and ($MIDI_BYTE_2=0)))
+if ($MIDI_BYTE_1>=%playingRangeLowKey[$MIDI_CHANNEL] and ($MIDI_BYTE_1<=%playingRangeHighKey[$MIDI_CHANNEL]))
+%keyCounter[$MIDI_CHANNEL] := %keyCounter[$MIDI_CHANNEL]-1
+end if
+end if
+end on
