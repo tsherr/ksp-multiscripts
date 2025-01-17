@@ -33,7 +33,7 @@ on init
     la_ChannelSelect -> width := 100
     la_ChannelSelect -> text := "Channel: "
 
-	declare ui_menu me_ChannelSelect
+	declare pers ui_menu me_ChannelSelect
     me_ChannelSelect -> x := 540
     me_ChannelSelect -> y := 5
     me_ChannelSelect -> width := 60

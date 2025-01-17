@@ -9,6 +9,7 @@ set_control_par(get_ui_id($la_ChannelSelect),$CONTROL_PAR_POS_Y,5)
 set_control_par(get_ui_id($la_ChannelSelect),$CONTROL_PAR_WIDTH,100)
 set_control_par_str(get_ui_id($la_ChannelSelect),$CONTROL_PAR_TEXT,"Channel: ")
 declare ui_menu $me_ChannelSelect
+make_persistent($me_ChannelSelect)
 set_control_par(get_ui_id($me_ChannelSelect),$CONTROL_PAR_POS_X,540)
 set_control_par(get_ui_id($me_ChannelSelect),$CONTROL_PAR_POS_Y,5)
 set_control_par(get_ui_id($me_ChannelSelect),$CONTROL_PAR_WIDTH,60)
