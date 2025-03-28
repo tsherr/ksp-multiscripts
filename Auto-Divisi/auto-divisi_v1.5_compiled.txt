@@ -1,0 +1,830 @@
+{ Compiled on Thu Mar 27 17:07:26 2025 }
+on init
+declare @pyrcu
+@pyrcu := "1.5"
+declare @tgfrm
+declare $nyf1r := 0
+declare $4wqrr := -1
+declare %wrv3c[128]
+declare $3pz2b := 0
+declare $yymri := 0
+declare %gsvxe[384]
+declare $yxgcj := 0
+declare %fe4mx[16]
+declare %zmtnf[16]
+declare $rw4mv
+$rw4mv := 0
+declare $hwaba := -1
+declare $1eucu := 0
+declare $q4xbq := 0
+declare $uy3tw := -1
+declare $duvvx
+declare $x5qe2
+declare $vodi4
+declare $hdcfp
+declare $fg4rw
+declare $g5k3r
+declare $4dw5h
+declare $2f1ls
+declare $kcqwi
+declare $5hcjz
+message("")
+set_script_title("Auto-divisi")
+set_ui_height_px(150)
+declare ui_label $actwj(1, 1) 
+set_text($actwj,"Auto-divisi " & "v" & @pyrcu & " - www.tobysherriff.net")
+move_control_px($actwj,60,130)
+hide_part($actwj,$HIDE_PART_BG)
+set_control_par(get_ui_id($actwj),$CONTROL_PAR_WIDTH,200)
+set_control_par(get_ui_id($actwj),$CONTROL_PAR_HEIGHT,18)
+set_control_par(get_ui_id($actwj),$CONTROL_PAR_FONT_TYPE,12)
+declare !i2hsn[4]
+declare !ct0a4[12]
+declare !0svp3[128]
+!i2hsn[0] := "A"
+!i2hsn[1] := "B"
+!i2hsn[2] := "C"
+!i2hsn[3] := "D"
+!ct0a4[0] := "C"
+!ct0a4[1] := "C#"
+!ct0a4[2] := "D"
+!ct0a4[3] := "D#"
+!ct0a4[4] := "E"
+!ct0a4[5] := "F"
+!ct0a4[6] := "F#"
+!ct0a4[7] := "G"
+!ct0a4[8] := "G#"
+!ct0a4[9] := "A"
+!ct0a4[10] := "A#"
+!ct0a4[11] := "B"
+$fg4rw := 0
+while ($fg4rw<128)
+!0svp3[$fg4rw] := !ct0a4[$fg4rw mod 12] & " " & ($fg4rw/12-2)
+inc($fg4rw)
+end while
+declare ui_knob $evkms(1, 4, 1) 
+declare ui_knob $fndpb(1, 4, 1) 
+declare ui_knob $tuo30(1, 16, 1) 
+declare ui_knob $hugqr(0, 50, 1) 
+declare ui_label $e2lma(1, 1) 
+declare ui_label $n0aqw(1, 1) 
+declare ui_menu $qj5zg
+declare ui_menu $dhj03
+declare ui_label $bgxah(1, 1) 
+declare ui_value_edit $qto5v(0, 128, $VALUE_EDIT_MODE_NOTE_NAMES) 
+declare ui_value_edit $prpsc(0, 128, $VALUE_EDIT_MODE_NOTE_NAMES) 
+declare ui_button $ww4qa
+declare ui_value_edit $jfkcc(0, 127, 1) 
+declare ui_value_edit $v5cly(0, 127, 1) 
+declare ui_button $0acyi
+declare ui_button $k3nl0
+declare ui_button $w4r02
+declare ui_button $ucbn5
+declare ui_label $xkirl(2, 3) 
+declare ui_label $ivymg(1, 1) 
+declare ui_label $nklyq(1, 1) 
+declare ui_label $l3l0h(1, 1) 
+declare ui_label $fzwj2(1, 1) 
+declare ui_label $walio(1, 1) 
+declare ui_label $j0dcf(1, 1) 
+declare ui_label $sp3ff(1, 1) 
+declare ui_label $xli4l(1, 1) 
+declare ui_label $m2oag(1, 1) 
+declare ui_label $55dsb(1, 1) 
+declare ui_label $smk32(1, 1) 
+declare ui_label $wvaqb(1, 1) 
+declare ui_label $rnoau(1, 1) 
+declare ui_label $0adk0(1, 1) 
+declare ui_label $vr4xm(1, 1) 
+declare ui_label $lmofl(1, 1) 
+declare %lhhrh[16]
+%lhhrh[0] := get_ui_id($ivymg)
+%lhhrh[1] := get_ui_id($nklyq)
+%lhhrh[2] := get_ui_id($l3l0h)
+%lhhrh[3] := get_ui_id($fzwj2)
+%lhhrh[4] := get_ui_id($walio)
+%lhhrh[5] := get_ui_id($j0dcf)
+%lhhrh[6] := get_ui_id($sp3ff)
+%lhhrh[7] := get_ui_id($xli4l)
+%lhhrh[8] := get_ui_id($m2oag)
+%lhhrh[9] := get_ui_id($55dsb)
+%lhhrh[10] := get_ui_id($smk32)
+%lhhrh[11] := get_ui_id($wvaqb)
+%lhhrh[12] := get_ui_id($rnoau)
+%lhhrh[13] := get_ui_id($0adk0)
+%lhhrh[14] := get_ui_id($vr4xm)
+%lhhrh[15] := get_ui_id($lmofl)
+make_persistent($evkms)
+make_persistent($fndpb)
+make_persistent($tuo30)
+make_persistent($hugqr)
+make_persistent($qj5zg)
+make_persistent($dhj03)
+make_persistent($qto5v)
+make_persistent($prpsc)
+make_persistent($ww4qa)
+make_persistent($0acyi)
+make_persistent($jfkcc)
+make_persistent($v5cly)
+$fg4rw := 0
+while ($fg4rw<16)
+set_control_par_str(%lhhrh[$fg4rw],$CONTROL_PAR_TEXT,"" & ($fg4rw+1) & ": ")
+inc($fg4rw)
+end while
+set_text($evkms,"In Port")
+set_text($fndpb,"Out Port")
+set_text($tuo30,"Voices")
+set_text($hugqr,"Buffer")
+set_text($e2lma,"Voice Stealing:")
+set_text($n0aqw,"Note Doubling:")
+add_menu_item($qj5zg,"Steal Newest",0)
+add_menu_item($qj5zg,"Steal Oldest",1)
+add_menu_item($qj5zg,"Steal Closest",2)
+add_menu_item($dhj03,"Prefer Lower Notes",0)
+add_menu_item($dhj03,"Prefer Higher Notes",1)
+add_menu_item($dhj03,"Drop Lower Voices",2)
+set_text($bgxah,"Note Limits:")
+set_text($qto5v,"")
+set_text($prpsc,"")
+set_text($0acyi,"Pass.")
+set_text($jfkcc,"CC")
+set_text($v5cly,"Thr")
+set_text($k3nl0,"Show Debug")
+set_text($w4r02,"Autoclear")
+set_text($ucbn5,"Clear")
+set_text($xkirl,"")
+set_control_par(get_ui_id($qj5zg),$CONTROL_PAR_WIDTH,120)
+set_control_par(get_ui_id($dhj03),$CONTROL_PAR_WIDTH,120)
+set_control_par(get_ui_id($qto5v),$CONTROL_PAR_WIDTH,55)
+set_control_par(get_ui_id($prpsc),$CONTROL_PAR_WIDTH,55)
+set_control_par(get_ui_id($jfkcc),$CONTROL_PAR_WIDTH,55)
+set_control_par(get_ui_id($v5cly),$CONTROL_PAR_WIDTH,55)
+set_control_par(get_ui_id($0acyi),$CONTROL_PAR_WIDTH,40)
+set_control_par(get_ui_id($w4r02),$CONTROL_PAR_WIDTH,55)
+set_control_par(get_ui_id($ucbn5),$CONTROL_PAR_WIDTH,55)
+set_control_par(get_ui_id($xkirl),$CONTROL_PAR_WIDTH,212)
+set_control_par(get_ui_id($xkirl),$CONTROL_PAR_HEIGHT,35)
+move_control($evkms,1,1)
+move_control($fndpb,2,1)
+move_control($tuo30,3,1)
+move_control($hugqr,4,1)
+move_control($e2lma,5,1)
+move_control($n0aqw,5,2)
+move_control($bgxah,5,3)
+set_control_par(get_ui_id($qj5zg),$CONTROL_PAR_POS_X,520)
+set_control_par(get_ui_id($qj5zg),$CONTROL_PAR_POS_Y,2)
+set_control_par(get_ui_id($dhj03),$CONTROL_PAR_POS_X,520)
+set_control_par(get_ui_id($dhj03),$CONTROL_PAR_POS_Y,23)
+set_control_par(get_ui_id($qto5v),$CONTROL_PAR_POS_X,520)
+set_control_par(get_ui_id($qto5v),$CONTROL_PAR_POS_Y,44)
+set_control_par(get_ui_id($prpsc),$CONTROL_PAR_POS_X,585)
+set_control_par(get_ui_id($prpsc),$CONTROL_PAR_POS_Y,44)
+set_control_par(get_ui_id($ww4qa),$CONTROL_PAR_POS_X,428)
+set_control_par(get_ui_id($0acyi),$CONTROL_PAR_POS_X,475)
+set_control_par(get_ui_id($jfkcc),$CONTROL_PAR_POS_X,520)
+set_control_par(get_ui_id($v5cly),$CONTROL_PAR_POS_X,585)
+set_control_par(get_ui_id($ww4qa),$CONTROL_PAR_POS_Y,65)
+set_control_par(get_ui_id($0acyi),$CONTROL_PAR_POS_Y,65)
+set_control_par(get_ui_id($jfkcc),$CONTROL_PAR_POS_Y,65)
+set_control_par(get_ui_id($v5cly),$CONTROL_PAR_POS_Y,65)
+set_control_par(get_ui_id($w4r02),$CONTROL_PAR_POS_X,520)
+set_control_par(get_ui_id($w4r02),$CONTROL_PAR_POS_Y,86)
+set_control_par(get_ui_id($ucbn5),$CONTROL_PAR_POS_X,585)
+set_control_par(get_ui_id($ucbn5),$CONTROL_PAR_POS_Y,86)
+move_control($k3nl0,5,5)
+move_control_px($xkirl,428,107)
+move_control($ivymg,1,3)
+move_control($nklyq,2,3)
+move_control($l3l0h,3,3)
+move_control($fzwj2,4,3)
+move_control($walio,1,4)
+move_control($j0dcf,2,4)
+move_control($sp3ff,3,4)
+move_control($xli4l,4,4)
+move_control($m2oag,1,5)
+move_control($55dsb,2,5)
+move_control($smk32,3,5)
+move_control($wvaqb,4,5)
+move_control($rnoau,1,6)
+move_control($0adk0,2,6)
+move_control($vr4xm,3,6)
+move_control($lmofl,4,6)
+set_control_par(get_ui_id($ucbn5),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($w4r02),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($xkirl),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+$hugqr := 20
+set_knob_defval($hugqr,$hugqr)
+$tuo30 := 4
+set_knob_defval($tuo30,$tuo30)
+$qto5v := 0
+$prpsc := 127
+$qj5zg := 2
+$dhj03 := 1
+$jfkcc := 64
+$v5cly := 64
+read_persistent_var($tuo30)
+$fg4rw := 0
+while ($fg4rw<16)
+if ($fg4rw<$tuo30)
+set_control_par(%lhhrh[$fg4rw],$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+else
+set_control_par(%lhhrh[$fg4rw],$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+end if
+inc($fg4rw)
+end while
+read_persistent_var($evkms)
+set_knob_label($evkms,!i2hsn[$evkms-1])
+read_persistent_var($fndpb)
+set_knob_label($fndpb,!i2hsn[$fndpb-1])
+read_persistent_var($ww4qa)
+if ($ww4qa=1)
+set_text($ww4qa,"Unison")
+set_control_par(get_ui_id($ww4qa),$CONTROL_PAR_WIDTH,40)
+set_control_par(get_ui_id($0acyi),$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+set_control_par(get_ui_id($jfkcc),$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+set_control_par(get_ui_id($v5cly),$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+else
+set_text($ww4qa,"Unison (off)")
+set_control_par(get_ui_id($ww4qa),$CONTROL_PAR_WIDTH,88)
+set_control_par(get_ui_id($0acyi),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($jfkcc),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($v5cly),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+end if
+set_control_help($evkms,"Set the MIDI port to listen on. MIDI messages on other ports will be ignored.")
+set_control_help($fndpb,"Set the MIDI port to which notes will be distributed.")
+set_control_help($tuo30,"Sets the number of independent voices to use for divisi.")
+set_control_help($hugqr,"Sets the length (ms) of the input buffer. A larger buffer will prevent unintended arpeggios and dropped notes, but will introduce latency.")
+set_control_help($qj5zg,"Determines which note should be released if a new note requires an existing note to be dropped.")
+set_control_help($dhj03,"Determines which notes should be doubled when multiple voices must play the same note.")
+set_control_help($bgxah,"Determines the range in which divisi notes will be processed. Notes outside of this range will be sent to all channels, so keyswitches can still be used.")
+set_control_help($qto5v,"The lowest MIDI note number to be processed for divisi.")
+set_control_help($prpsc,"The highest MIDI note number to be processed for divisi.")
+set_control_help($ww4qa,"Enables or disables Unison (monophonic) mode. When enabled, unison playback can be enforced by an assignable CC and threshold.")
+set_control_help($0acyi,"If enabled, the CC values used to enforce unison playback will be passed through to the instruments.")
+set_control_help($jfkcc,"The CC that will be used to enforce unison playback.")
+set_control_help($v5cly,"Determines the CC threshold for unison mode; Values at or above this threshold will engage unison mode.")
+set_control_help($k3nl0,"Shows or hides the debug output pane.")
+set_control_help($w4r02,"Automatically purge the debug output as notes are played.")
+set_control_help($ucbn5,"Clears the debug output pane.")
+set_control_help($ivymg,"Shows the status of channel " & 1 & ".")
+set_control_help($nklyq,"Shows the status of channel " & 2 & ".")
+set_control_help($l3l0h,"Shows the status of channel " & 3 & ".")
+set_control_help($fzwj2,"Shows the status of channel " & 4 & ".")
+set_control_help($walio,"Shows the status of channel " & 5 & ".")
+set_control_help($j0dcf,"Shows the status of channel " & 6 & ".")
+set_control_help($sp3ff,"Shows the status of channel " & 7 & ".")
+set_control_help($xli4l,"Shows the status of channel " & 8 & ".")
+set_control_help($m2oag,"Shows the status of channel " & 9 & ".")
+set_control_help($55dsb,"Shows the status of channel " & 10 & ".")
+set_control_help($smk32,"Shows the status of channel " & 11 & ".")
+set_control_help($wvaqb,"Shows the status of channel " & 12 & ".")
+set_control_help($rnoau,"Shows the status of channel " & 13 & ".")
+set_control_help($0adk0,"Shows the status of channel " & 14 & ".")
+set_control_help($vr4xm,"Shows the status of channel " & 15 & ".")
+set_control_help($lmofl,"Shows the status of channel " & 16 & ".")
+$fg4rw := 0
+while ($fg4rw<num_elements(%wrv3c))
+%wrv3c[$fg4rw] := -1
+inc($fg4rw)
+end while
+$3pz2b := 0
+$fg4rw := 0
+while ($fg4rw<num_elements(%fe4mx))
+%fe4mx[$fg4rw] := -1
+inc($fg4rw)
+end while
+$fg4rw := 0
+while ($fg4rw<num_elements(%zmtnf))
+%zmtnf[$fg4rw] := -1
+inc($fg4rw)
+end while
+$fg4rw := 0
+while ($fg4rw<num_elements(%gsvxe))
+%gsvxe[$fg4rw] := -1
+inc($fg4rw)
+end while
+$yxgcj := 0
+end on
+function AddToInQueue
+if ($yxgcj=128)
+exit
+end if
+%gsvxe[$yxgcj*3] := $duvvx
+%gsvxe[$yxgcj*3+1] := $x5qe2
+%gsvxe[$yxgcj*3+2] := $vodi4
+inc($yxgcj)
+end function
+function ConsolidateInQueue
+$fg4rw := 0
+while ($fg4rw<128)
+if (%gsvxe[$fg4rw*3]=-1)
+$g5k3r := $fg4rw+1
+while ($g5k3r<128 and (%gsvxe[$g5k3r*3]=-1))
+inc($g5k3r)
+end while
+if ($g5k3r>=128)
+inc($fg4rw)
+exit
+end if
+%gsvxe[$fg4rw*3] := %gsvxe[$g5k3r*3]
+%gsvxe[$fg4rw*3+1] := %gsvxe[$g5k3r*3+1]
+%gsvxe[$fg4rw*3+2] := %gsvxe[$g5k3r*3+2]
+%gsvxe[$g5k3r*3] := -1
+%gsvxe[$g5k3r*3+1] := -1
+%gsvxe[$g5k3r*3+2] := -1
+end if
+inc($fg4rw)
+end while
+end function
+function RemoveCancelledNotesFromInQueue
+$fg4rw := 0
+$2f1ls := $yxgcj
+while ($fg4rw<$2f1ls)
+if (%gsvxe[$fg4rw*3]=$MIDI_COMMAND_NOTE_OFF)
+$kcqwi := 0
+$g5k3r := 0
+while ($g5k3r<$fg4rw)
+if (%gsvxe[$g5k3r*3]=$MIDI_COMMAND_NOTE_ON and (%gsvxe[$g5k3r*3+1]=%gsvxe[$fg4rw*3+1]))
+%gsvxe[$g5k3r*3] := -1
+%gsvxe[$g5k3r*3+1] := -1
+%gsvxe[$g5k3r*3+2] := -1
+dec($yxgcj)
+$kcqwi := 1
+end if
+inc($g5k3r)
+end while
+if ($kcqwi=1)
+%gsvxe[$fg4rw*3] := -1
+%gsvxe[$fg4rw*3+1] := -1
+%gsvxe[$fg4rw*3+2] := -1
+dec($yxgcj)
+end if
+end if
+inc($fg4rw)
+end while
+call ConsolidateInQueue
+end function
+function GetMostRecentHeldNote
+$fg4rw := 0
+$hdcfp := -1
+$5hcjz := -1
+while ($fg4rw<num_elements(%wrv3c))
+if (%wrv3c[$fg4rw]>$5hcjz)
+$hdcfp := $fg4rw
+$5hcjz := %wrv3c[$fg4rw]
+end if
+inc($fg4rw)
+end while
+message("newest: " & $hdcfp)
+end function
+function GetOldestHeldNote
+if ($3pz2b=0)
+$hdcfp := -1
+exit
+end if
+$fg4rw := 0
+$hdcfp := -1
+$5hcjz := -1
+while ($fg4rw<num_elements(%wrv3c) and ($hdcfp=-1))
+if (%wrv3c[$fg4rw]>$5hcjz)
+$hdcfp := $fg4rw
+$5hcjz := %wrv3c[$fg4rw]
+end if
+inc($fg4rw)
+end while
+while ($fg4rw<num_elements(%wrv3c))
+if (%wrv3c[$fg4rw] # -1 and (%wrv3c[$fg4rw]<%wrv3c[$fg4rw]))
+$hdcfp := $fg4rw
+%wrv3c[$fg4rw] := %wrv3c[$fg4rw]
+end if
+inc($fg4rw)
+end while
+message("oldest: " & $hdcfp)
+end function
+function GetClosestHeldNote
+if ($3pz2b=0)
+$hdcfp := -1
+exit
+end if
+$4dw5h := -1
+$fg4rw := 1
+while ($duvvx+$fg4rw<num_elements(%wrv3c) and (%wrv3c[$duvvx+$fg4rw]=-1))
+inc($fg4rw)
+end while
+if ($duvvx+$fg4rw<num_elements(%wrv3c))
+$4dw5h := $duvvx+$fg4rw
+end if
+$fg4rw := 1
+while ($duvvx-$fg4rw>=0 and (%wrv3c[$duvvx-$fg4rw]=-1))
+inc($fg4rw)
+end while
+if ($4dw5h=-1 and ($duvvx-$fg4rw=-1))
+$hdcfp := $duvvx
+exit
+end if
+if ($4dw5h # -1 and ($duvvx-$fg4rw=-1))
+$hdcfp := $4dw5h
+exit
+end if
+if ($4dw5h=-1 and ($duvvx-$fg4rw # -1))
+$hdcfp := $duvvx-$fg4rw
+exit
+end if
+if ($4dw5h # -1 and ($duvvx-$fg4rw # -1))
+if ($4dw5h-$duvvx<$fg4rw)
+$hdcfp := $4dw5h
+exit
+else
+$hdcfp := $duvvx+$fg4rw
+exit
+end if
+end if
+end function
+function PrintDebug
+if ($k3nl0=1)
+add_text_line($xkirl,@tgfrm)
+end if
+end function
+function UpdateHeldNotesFromQueue
+$fg4rw := 0
+while ($fg4rw<$yxgcj)
+if (%gsvxe[$fg4rw*3]=$MIDI_COMMAND_NOTE_OFF and (%wrv3c[%gsvxe[$fg4rw*3+1]] # -1))
+%wrv3c[%gsvxe[$fg4rw*3+1]] := -1
+dec($3pz2b)
+end if
+inc($fg4rw)
+end while
+$fg4rw := 0
+while ($fg4rw<$yxgcj)
+if (%gsvxe[$fg4rw*3]=$MIDI_COMMAND_NOTE_ON)
+if ($3pz2b>=$tuo30)
+$duvvx := %gsvxe[$fg4rw*3+1]
+$2f1ls := $fg4rw
+select ($qj5zg)
+case 0
+call GetMostRecentHeldNote
+case 1
+call GetOldestHeldNote
+case 2
+call GetClosestHeldNote
+end select
+$fg4rw := $2f1ls
+%wrv3c[$hdcfp] := -1
+dec($3pz2b)
+end if
+if (%wrv3c[%gsvxe[$fg4rw*3+1]]=-1)
+%wrv3c[%gsvxe[$fg4rw*3+1]] := $ENGINE_UPTIME
+inc($3pz2b)
+end if
+end if
+inc($fg4rw)
+end while
+@tgfrm := "Notes (" & $3pz2b & "): ["
+$fg4rw := 0
+while ($fg4rw<num_elements(%wrv3c))
+if (%wrv3c[$fg4rw] # -1)
+@tgfrm := @tgfrm & $fg4rw & ","
+end if
+inc($fg4rw)
+end while
+@tgfrm := @tgfrm & "]"
+call PrintDebug
+end function
+function InQueueContainsNoteOns
+$fg4rw := 0
+$hdcfp := 0
+while ($fg4rw<$yxgcj)
+if (%gsvxe[$fg4rw*3]=$MIDI_COMMAND_NOTE_ON)
+$hdcfp := 1
+exit
+end if
+inc($fg4rw)
+end while
+end function
+function KillReleasedNotes
+$fg4rw := 0
+while ($fg4rw<$tuo30)
+if (%fe4mx[$fg4rw] # -1 and (%wrv3c[%fe4mx[$fg4rw]] # -1))
+%zmtnf[$fg4rw] := %fe4mx[$fg4rw]
+else
+%zmtnf[$fg4rw] := -1
+end if
+inc($fg4rw)
+end while
+end function
+function SetHeldNotesIteratorToFront
+$yymri := 0
+end function
+function GetNextHeldNoteAsc
+if ($3pz2b=0)
+$hdcfp := -1
+exit
+end if
+while (%wrv3c[$yymri]=-1)
+inc($yymri)
+if ($yymri>=num_elements(%wrv3c))
+call SetHeldNotesIteratorToFront
+end if
+end while
+$hdcfp := $yymri
+inc($yymri)
+if ($yymri>=num_elements(%wrv3c))
+call SetHeldNotesIteratorToFront
+end if
+end function
+function SetHeldNotesIteratorToEnd
+$yymri := num_elements(%wrv3c)-1
+end function
+function GetNextHeldNoteDesc
+if ($3pz2b=0)
+$hdcfp := -1
+exit
+end if
+while (%wrv3c[$yymri]=-1)
+dec($yymri)
+if ($yymri<0)
+call SetHeldNotesIteratorToEnd
+end if
+end while
+$hdcfp := $yymri
+dec($yymri)
+if ($yymri<0)
+call SetHeldNotesIteratorToEnd
+end if
+end function
+function DistributeNotesToVoices
+$fg4rw := 0
+while ($fg4rw<num_elements(%zmtnf))
+%zmtnf[$fg4rw] := -1
+inc($fg4rw)
+end while
+if ($dhj03=2 and ($ww4qa=0 or ($q4xbq<$v5cly)))
+call SetHeldNotesIteratorToFront
+$fg4rw := 0
+while ($fg4rw<$3pz2b and ($fg4rw<$tuo30))
+if ($3pz2b=0)
+$hdcfp := -1
+exit
+end if
+while (%wrv3c[$yymri]=-1)
+inc($yymri)
+if ($yymri>=num_elements(%wrv3c))
+call SetHeldNotesIteratorToFront
+end if
+end while
+$hdcfp := $yymri
+inc($yymri)
+if ($yymri>=num_elements(%wrv3c))
+call SetHeldNotesIteratorToFront
+end if
+%zmtnf[$fg4rw] := $hdcfp
+inc($fg4rw)
+end while
+else
+call SetHeldNotesIteratorToFront
+$fg4rw := 0
+while ($fg4rw<($tuo30/$3pz2b*$3pz2b))
+call GetNextHeldNoteAsc
+%zmtnf[$fg4rw] := $hdcfp
+inc($fg4rw)
+end while
+select ($dhj03)
+case 0
+call SetHeldNotesIteratorToFront
+while ($fg4rw<$tuo30)
+call GetNextHeldNoteAsc
+%zmtnf[$fg4rw] := $hdcfp
+inc($fg4rw)
+end while
+case 1
+call SetHeldNotesIteratorToEnd
+while ($fg4rw<$tuo30)
+call GetNextHeldNoteDesc
+%zmtnf[$fg4rw] := $hdcfp
+inc($fg4rw)
+end while
+end select
+end if
+sort(%zmtnf,1)
+end function
+function SendMIDICommands
+$fg4rw := 0
+while ($fg4rw<$tuo30)
+@tgfrm := "%temp_voices[$i] " & %zmtnf[$fg4rw]
+call PrintDebug
+if (%zmtnf[$fg4rw] # %fe4mx[$fg4rw])
+if (%zmtnf[$fg4rw]=-1 and (%fe4mx[$fg4rw] # -1))
+set_midi($fg4rw+(16*($fndpb-1)),$MIDI_COMMAND_NOTE_OFF,%fe4mx[$fg4rw],127)
+%fe4mx[$fg4rw] := -1
+set_control_par_str(%lhhrh[$fg4rw],$CONTROL_PAR_TEXT,"" & ($fg4rw+1) & ": ")
+@tgfrm := "Note off - channel: " & ($fg4rw+(16*($fndpb-1))) & " note: " & %fe4mx[$fg4rw]
+call PrintDebug
+else
+if (%zmtnf[$fg4rw] # -1)
+set_midi($fg4rw+(16*($fndpb-1)),$MIDI_COMMAND_NOTE_ON,%zmtnf[$fg4rw],$hwaba)
+set_control_par_str(%lhhrh[$fg4rw],$CONTROL_PAR_TEXT,"" & ($fg4rw+1) & ": " & !0svp3[%zmtnf[$fg4rw]])
+@tgfrm := "Note on - channel: " & ($fg4rw+(16*($fndpb-1))) & " note: " & %zmtnf[$fg4rw] & " vel: " & $hwaba
+call PrintDebug
+if (%fe4mx[$fg4rw] # -1)
+set_midi($fg4rw+(16*($fndpb-1)),$MIDI_COMMAND_NOTE_OFF,%fe4mx[$fg4rw],127)
+@tgfrm := "Note off - channel: " & ($fg4rw+(16*($fndpb-1))) & " note: " & %fe4mx[$fg4rw]
+call PrintDebug
+end if
+%fe4mx[$fg4rw] := %zmtnf[$fg4rw]
+end if
+end if
+end if
+inc($fg4rw)
+end while
+end function
+function ClearInQueue
+$yxgcj := 0
+$fg4rw := 0
+while ($fg4rw<num_elements(%gsvxe))
+%gsvxe[$fg4rw] := -1
+inc($fg4rw)
+end while
+end function
+function Lock
+if ($4wqrr # $NI_CALLBACK_ID)
+while ($nyf1r>0)
+wait(100)
+end while
+inc($nyf1r)
+$4wqrr := $NI_CALLBACK_ID
+end if
+end function
+function Unlock
+if ($nyf1r>0)
+dec($nyf1r)
+if ($nyf1r=0)
+$4wqrr := -1
+end if
+end if
+end function
+function Reset
+call Lock
+$fg4rw := 0
+while ($fg4rw<num_elements(%fe4mx))
+if (%fe4mx[$fg4rw] # -1)
+set_midi($fg4rw+(16*($fndpb-1)),$MIDI_COMMAND_NOTE_OFF,%fe4mx[$fg4rw],0)
+set_control_par_str(%lhhrh[$fg4rw],$CONTROL_PAR_TEXT,"" & ($fg4rw+1) & ": ")
+%fe4mx[$fg4rw] := -1
+end if
+inc($fg4rw)
+end while
+$fg4rw := 0
+while ($fg4rw<num_elements(%wrv3c))
+%wrv3c[$fg4rw] := -1
+inc($fg4rw)
+end while
+$3pz2b := 0
+@tgfrm := "MIDI reset on port " & !i2hsn[$fndpb-1]
+call PrintDebug
+call Unlock
+end function
+on midi_in
+if ($MIDI_CHANNEL<(($evkms-1)*16) or ($MIDI_CHANNEL>=($evkms*16)))
+ignore_midi
+exit
+end if
+if (($MIDI_COMMAND=$MIDI_COMMAND_NOTE_ON or ($MIDI_COMMAND=$MIDI_COMMAND_NOTE_OFF)) and ($MIDI_BYTE_1>=$qto5v and ($MIDI_BYTE_1<=$prpsc)))
+call Lock
+ignore_midi
+if ($MIDI_COMMAND=$MIDI_COMMAND_NOTE_ON and ($MIDI_BYTE_2>0))
+$hwaba := $MIDI_BYTE_2
+if ($ww4qa=1 and ($q4xbq>=$v5cly))
+$fg4rw := 0
+while ($fg4rw<$tuo30)
+if (%fe4mx[$fg4rw] # -1)
+$duvvx := $MIDI_COMMAND_NOTE_OFF
+$x5qe2 := %fe4mx[$fg4rw]
+$vodi4 := 0
+call AddToInQueue
+end if
+inc($fg4rw)
+end while
+end if
+$uy3tw := $MIDI_BYTE_1
+end if
+$duvvx := $MIDI_COMMAND
+if ($MIDI_COMMAND=$MIDI_COMMAND_NOTE_ON and ($MIDI_BYTE_2=0))
+$duvvx := $MIDI_COMMAND_NOTE_OFF
+end if
+$x5qe2 := $MIDI_BYTE_1
+$vodi4 := $MIDI_BYTE_2
+call AddToInQueue
+if ($rw4mv=1)
+call Unlock
+exit
+end if
+$rw4mv := 1
+call Unlock
+if ($hugqr>0 and ($ww4qa=0 or ($q4xbq<$v5cly)))
+wait($hugqr*1000)
+end if
+if ($w4r02=1)
+set_text($xkirl,"")
+end if
+call Lock
+$rw4mv := 0
+call RemoveCancelledNotesFromInQueue
+call UpdateHeldNotesFromQueue
+call InQueueContainsNoteOns
+if ($hdcfp=0)
+call KillReleasedNotes
+else
+call DistributeNotesToVoices
+end if
+call SendMIDICommands
+call ClearInQueue
+call Unlock
+else
+if ($MIDI_COMMAND=$MIDI_COMMAND_CC and ($MIDI_BYTE_1=$jfkcc))
+$q4xbq := $MIDI_BYTE_2
+end if
+if ($MIDI_COMMAND=$MIDI_COMMAND_NOTE_ON or ($MIDI_COMMAND=$MIDI_COMMAND_NOTE_OFF))
+if ($w4r02=1)
+set_text($xkirl,"")
+end if
+@tgfrm := "Note " & $MIDI_BYTE_1 & " outside divisi range."
+call PrintDebug
+end if
+if ($0acyi=0 and ($MIDI_COMMAND=$MIDI_COMMAND_CC) and ($MIDI_BYTE_1=$jfkcc))
+ignore_midi
+else
+$fg4rw := 0
+while ($fg4rw<$tuo30)
+set_midi($fg4rw+(16*($fndpb-1)),$MIDI_COMMAND,$MIDI_BYTE_1,$MIDI_BYTE_2)
+inc($fg4rw)
+end while
+end if
+end if
+end on
+on ui_control($ww4qa)
+if ($ww4qa=1)
+set_text($ww4qa,"Unison")
+set_control_par(get_ui_id($ww4qa),$CONTROL_PAR_WIDTH,40)
+set_control_par(get_ui_id($0acyi),$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+set_control_par(get_ui_id($jfkcc),$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+set_control_par(get_ui_id($v5cly),$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+else
+set_text($ww4qa,"Unison (off)")
+set_control_par(get_ui_id($ww4qa),$CONTROL_PAR_WIDTH,88)
+set_control_par(get_ui_id($0acyi),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($jfkcc),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($v5cly),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+end if
+end on
+on ui_control($k3nl0)
+if ($k3nl0=1)
+set_control_par(get_ui_id($w4r02),$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+set_control_par(get_ui_id($ucbn5),$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+set_control_par(get_ui_id($xkirl),$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+else
+set_control_par(get_ui_id($w4r02),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($ucbn5),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+set_control_par(get_ui_id($xkirl),$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+end if
+end on
+on ui_control($ucbn5)
+if ($ucbn5=1)
+$ucbn5 := 0
+end if
+set_text($xkirl,"")
+end on
+on ui_control($tuo30)
+call Reset
+$1eucu := 0
+while ($1eucu<16)
+if ($1eucu<$tuo30)
+set_control_par(%lhhrh[$1eucu],$CONTROL_PAR_HIDE,$HIDE_PART_NOTHING)
+else
+set_control_par(%lhhrh[$1eucu],$CONTROL_PAR_HIDE,$HIDE_WHOLE_CONTROL)
+end if
+inc($1eucu)
+end while
+end on
+on ui_control($evkms)
+set_knob_label($evkms,!i2hsn[$evkms-1])
+end on
+on ui_control($fndpb)
+set_knob_label($fndpb,!i2hsn[$fndpb-1])
+end on
+on ui_control($hugqr)
+if ($hugqr=0)
+set_control_par_str(get_ui_id($hugqr),$CONTROL_PAR_LABEL,"Off")
+else
+set_control_par_str(get_ui_id($hugqr),$CONTROL_PAR_LABEL,$hugqr)
+end if
+end on
+on ui_control($qto5v)
+if ($qto5v>$prpsc)
+$qto5v := $prpsc
+end if
+end on
+on ui_control($prpsc)
+if ($prpsc<$qto5v)
+$prpsc := $qto5v
+end if
+end on
