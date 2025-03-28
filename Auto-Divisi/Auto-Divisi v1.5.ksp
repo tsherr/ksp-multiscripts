@@ -530,13 +530,13 @@ function GetClosestHeldNote
         exit
     end if
 
-    {IF there is an upper and a lower neighbour, return the closest (higher on a tie)}
+    {If there is an upper and a lower neighbour, return the closest (higher on a tie)}
     if (($n # -1) and (($p0 - $i) # -1))
-        if (($n - $p0) < ($i))
+        if (($n - $p0) <= ($i))
             $r0 := $n
             exit
         else
-            $r0 := $p0 + $i
+            $r0 := $p0 - $i
             exit
         end if
     end if

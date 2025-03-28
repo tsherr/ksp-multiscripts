@@ -1,4 +1,4 @@
-{ Compiled on Thu Mar 27 17:07:26 2025 }
+{ Compiled on Thu Mar 27 21:40:52 2025 }
 on init
 declare @pyrcu
 @pyrcu := "1.5"
@@ -431,11 +431,11 @@ $hdcfp := $duvvx-$fg4rw
 exit
 end if
 if ($4dw5h # -1 and ($duvvx-$fg4rw # -1))
-if ($4dw5h-$duvvx<$fg4rw)
+if ($4dw5h-$duvvx<=$fg4rw)
 $hdcfp := $4dw5h
 exit
 else
-$hdcfp := $duvvx+$fg4rw
+$hdcfp := $duvvx-$fg4rw
 exit
 end if
 end if
