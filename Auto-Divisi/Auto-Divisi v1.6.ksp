@@ -18,7 +18,7 @@ Changelog:
 on init            
 
 	declare @VERSION_NUMBER
-	@VERSION_NUMBER := "1.5"
+	@VERSION_NUMBER := "1.6"
 
     {***Globals and constants***}
     declare const $TRUE := 1
