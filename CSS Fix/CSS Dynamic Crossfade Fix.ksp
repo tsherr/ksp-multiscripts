@@ -7,6 +7,7 @@
 	As soon as a note breaks the silence, the most recent dynamics CC value should be processed.
 
 	Version History:
+		v0.3: Dynamics crossfade CC values are allowed through if the sustain pedal is down.
 		v0.2: Fixed an edge-case where the script would think a negative number of notes were being held.
 		v0.1: initial implementation
 }
@@ -20,7 +21,7 @@ on init
 	define NUM_CHANNELS := 64
 
 	define SCRIPT_TITLE := "CSS DC FX"
-	define VERSION_STRING := "v0.2"
+	define VERSION_STRING := "v0.3"
 	
 	set_script_title(SCRIPT_TITLE & " " & VERSION_STRING)
 
@@ -93,8 +94,9 @@ on init
 	declare pers dynamicsCrossfadeCCs[NUM_CHANNELS]
 	declare pers playingRangeLowKey[NUM_CHANNELS]
 	declare pers playingRangeHighKey[NUM_CHANNELS]
-	declare pers lastDynamicsCrossfadeCCValue[NUM_CHANNELS];
-	declare keyCounter[NUM_CHANNELS];
+	declare pers lastDynamicsCrossfadeCCValue[NUM_CHANNELS]
+	declare keyCounter[NUM_CHANNELS]
+	declare susPedal := 0
 	declare temp
 
 	//Initialization
@@ -139,6 +141,10 @@ end on
 
 on midi_in
 
+	if (MIDI_COMMAND = MIDI_COMMAND_CC and MIDI_BYTE_1 = 64)
+		susPedal := MIDI_BYTE_2
+	end if
+
 	if (MIDI_COMMAND = MIDI_COMMAND_CC and bu_DynamicsCrossfadeCCLearn = TRUE) //Learn CC
 		dynamicsCrossfadeCCs[me_ChannelSelect] := MIDI_BYTE_1
 		va_DynamicsCrossfadeCC := MIDI_BYTE_1
@@ -151,9 +157,9 @@ on midi_in
 		//Save most recent dynamics crossfade CC value
 		lastDynamicsCrossfadeCCValue[MIDI_CHANNEL] := MIDI_BYTE_2
 
-		//Only allow the crossfade value to pass through if notes are playing
+		//Only allow the crossfade value to pass through if notes are playing, or if the sus pedal is down
 		temp := NoNotesArePlaying(MIDI_CHANNEL)
-		if temp = TRUE
+		if temp = TRUE and susPedal = 0
 			ignore_midi
 		end if
 
