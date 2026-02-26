@@ -2,6 +2,8 @@
 Author: Toby Sherriff - www.tobysherriff.net
 
 Changelog:
+    v1.7 - Added a drop-higher note doubling mode that functions in the opposite manner as drop-lower
+         - Added the ability to assign a CC to the note doubling dropdown
     v1.6 - Added an output channel offset modifier
          - Removed debug output
     v1.5 - Added a drop-lower-voices mode that will only generate as many voices as there are notes played
@@ -13,12 +15,12 @@ Changelog:
     v1.0 - Initial implementation
 }
 
-{ #pragma save_compiled_source auto-divisi_v1.6_compiled.txt }
+{ #pragma save_compiled_source auto-divisi_v1.7_compiled.txt }
 
 on init            
 
 	declare @VERSION_NUMBER
-	@VERSION_NUMBER := "1.6"
+	@VERSION_NUMBER := "1.7"
 
     {***Globals and constants***}
     declare const $TRUE := 1
@@ -29,7 +31,8 @@ on init
     declare const $STEAL_CLOSEST := 2
     declare const $PREFER_LOWER := 0
     declare const $PREFER_HIGHER := 1
-    declare const $DROP_LOWER_VOICES := 2
+    declare const $DROP_HIGHER_VOICES := 2
+    declare const $DROP_LOWER_VOICES := 3
     declare const $IN_QUEUE_LENGTH := 128 {The number of items in the in queue (not the number of indicies)}
     declare const $IN_QUEUE_ELEMENT_WIDTH := 3 {the number of array indicies used by each item in queue item}
     declare @debug_msg
@@ -114,9 +117,10 @@ on init
     declare ui_label $note_doubling_mode_label(1, 1)
     declare ui_menu $voice_stealing_mode
     declare ui_menu $note_doubling_mode
+    declare ui_value_edit $note_doubling_cc(0, 127, 1)
     declare ui_label $note_limits (1, 1)
-    declare ui_value_edit $low_limit(0, 128, $VALUE_EDIT_MODE_NOTE_NAMES)
-    declare ui_value_edit $high_limit(0, 128, $VALUE_EDIT_MODE_NOTE_NAMES)
+    declare ui_value_edit $low_limit(0, 127, $VALUE_EDIT_MODE_NOTE_NAMES)
+    declare ui_value_edit $high_limit(0, 127, $VALUE_EDIT_MODE_NOTE_NAMES)
     declare ui_label $channel_offset_label (1, 1)
     declare ui_value_edit $channel_out_offset(0, 15, 1)
     declare ui_button $mono_enabled
@@ -167,6 +171,7 @@ on init
     make_persistent($buffer_length_ms)
     make_persistent($voice_stealing_mode)
     make_persistent($note_doubling_mode)
+    make_persistent($note_doubling_cc)
     make_persistent($low_limit)
     make_persistent($high_limit)
     make_persistent($channel_out_offset)
@@ -187,12 +192,14 @@ on init
     set_text($buffer_length_ms, "Buffer")
     set_text($voice_stealing_mode_label, "Voice Stealing:")
     set_text($note_doubling_mode_label, "Note Doubling:")
+    set_text($note_doubling_cc, "CC")
     add_menu_item($voice_stealing_mode, "Steal Newest", $STEAL_NEWEST)
     add_menu_item($voice_stealing_mode, "Steal Oldest", $STEAL_OLDEST)
     add_menu_item($voice_stealing_mode, "Steal Closest", $STEAL_CLOSEST)
-    add_menu_item($note_doubling_mode, "Prefer Lower Notes", $PREFER_LOWER)
-    add_menu_item($note_doubling_mode, "Prefer Higher Notes", $PREFER_HIGHER)
-    add_menu_item($note_doubling_mode, "Drop Lower Voices", $DROP_LOWER_VOICES)
+    add_menu_item($note_doubling_mode, "Prefer Lo Notes", $PREFER_LOWER)
+    add_menu_item($note_doubling_mode, "Prefer Hi Notes", $PREFER_HIGHER)
+    add_menu_item($note_doubling_mode, "Drop Hi Voices", $DROP_HIGHER_VOICES)
+    add_menu_item($note_doubling_mode, "Drop Lo Voices", $DROP_LOWER_VOICES)
     set_text($note_limits, "Note Limits:")
     set_text($channel_offset_label, "Out Ch. Offset")
     set_text($channel_out_offset, "")
@@ -206,46 +213,61 @@ on init
     set_text($debug_clear, "Clear")
     set_text($debug_output, "")
 
-    set_control_par(get_ui_id($voice_stealing_mode), $CONTROL_PAR_WIDTH, 120)
-    set_control_par(get_ui_id($note_doubling_mode), $CONTROL_PAR_WIDTH, 120)
-    set_control_par(get_ui_id($low_limit), $CONTROL_PAR_WIDTH, 55)
-    set_control_par(get_ui_id($high_limit), $CONTROL_PAR_WIDTH, 55)
+    move_control($in_port, 1, 1)
+    move_control($out_port, 2, 1)
+    move_control($max_voices, 3, 1)
+    move_control($buffer_length_ms, 4, 1)
+
+    set_control_par(get_ui_id($voice_stealing_mode_label), $CONTROL_PAR_WIDTH, 77)
+    set_control_par(get_ui_id($note_doubling_mode_label), $CONTROL_PAR_WIDTH, 77)
+    set_control_par(get_ui_id($note_limits), $CONTROL_PAR_WIDTH, 77)
+    set_control_par(get_ui_id($channel_offset_label), $CONTROL_PAR_WIDTH, 77)
+    set_control_par(get_ui_id($mono_enabled), $CONTROL_PAR_WIDTH, 77)
+    set_control_par(get_ui_id($voice_stealing_mode), $CONTROL_PAR_WIDTH, 138)
+    set_control_par(get_ui_id($note_doubling_mode), $CONTROL_PAR_WIDTH, 88)
+    set_control_par(get_ui_id($note_doubling_cc), $CONTROL_PAR_WIDTH, 50)
+    set_control_par(get_ui_id($low_limit), $CONTROL_PAR_WIDTH, 65)
+    set_control_par(get_ui_id($high_limit), $CONTROL_PAR_WIDTH, 65)
+    set_control_par(get_ui_id($channel_out_offset), $CONTROL_PAR_WIDTH, 138)
     set_control_par(get_ui_id($mono_cc), $CONTROL_PAR_WIDTH, 55)
     set_control_par(get_ui_id($mono_threshold), $CONTROL_PAR_WIDTH, 55)
     set_control_par(get_ui_id($mono_passthrough), $CONTROL_PAR_WIDTH, 40)
     set_control_par(get_ui_id($debug_auto_clear), $CONTROL_PAR_WIDTH, 55)
     set_control_par(get_ui_id($debug_clear), $CONTROL_PAR_WIDTH, 55)
     set_control_par(get_ui_id($debug_output), $CONTROL_PAR_WIDTH, 212)
-    set_control_par(get_ui_id($debug_output), $CONTROL_PAR_HEIGHT, 35)
+    set_control_par(get_ui_id($debug_output), $CONTROL_PAR_HEIGHT, 35)    
     
-    move_control($in_port, 1, 1)
-    move_control($out_port, 2, 1)
-    move_control($max_voices, 3, 1)
-    move_control($buffer_length_ms, 4, 1)
-    move_control($voice_stealing_mode_label, 5, 1)
-    move_control($note_doubling_mode_label, 5, 2)
-    move_control($note_limits, 5, 3)    
-    set_control_par(get_ui_id($voice_stealing_mode), $CONTROL_PAR_POS_X, 520)
-    set_control_par(get_ui_id($voice_stealing_mode), $CONTROL_PAR_POS_Y, 2)
-    set_control_par(get_ui_id($note_doubling_mode), $CONTROL_PAR_POS_X, 520)
-    set_control_par(get_ui_id($note_doubling_mode), $CONTROL_PAR_POS_Y, 23)
-    set_control_par(get_ui_id($low_limit), $CONTROL_PAR_POS_X, 520)
-    set_control_par(get_ui_id($low_limit), $CONTROL_PAR_POS_Y, 44)
-    set_control_par(get_ui_id($high_limit), $CONTROL_PAR_POS_X, 585)
-    set_control_par(get_ui_id($high_limit), $CONTROL_PAR_POS_Y, 44)
-    set_control_par(get_ui_id($channel_offset_label), $CONTROL_PAR_POS_X, 428)
+    set_control_par(get_ui_id($voice_stealing_mode_label), $CONTROL_PAR_POS_X, 425)
+    set_control_par(get_ui_id($voice_stealing_mode_label), $CONTROL_PAR_POS_Y, 2)
+    set_control_par(get_ui_id($note_doubling_mode_label), $CONTROL_PAR_POS_X, 425)
+    set_control_par(get_ui_id($note_doubling_mode_label), $CONTROL_PAR_POS_Y, 23)
+    set_control_par(get_ui_id($note_limits), $CONTROL_PAR_POS_X, 425)
+    set_control_par(get_ui_id($note_limits), $CONTROL_PAR_POS_Y, 44)
+    set_control_par(get_ui_id($channel_offset_label), $CONTROL_PAR_POS_X, 425)
     set_control_par(get_ui_id($channel_offset_label), $CONTROL_PAR_POS_Y, 65)
-    set_control_par(get_ui_id($channel_out_offset), $CONTROL_PAR_POS_X, 520)
-    set_control_par(get_ui_id($channel_out_offset), $CONTROL_PAR_POS_Y, 65)
-    set_control_par(get_ui_id($mono_enabled), $CONTROL_PAR_POS_X, 428)
+    set_control_par(get_ui_id($mono_enabled), $CONTROL_PAR_POS_X, 425)
+    set_control_par(get_ui_id($mono_enabled), $CONTROL_PAR_POS_Y, 86)
+    set_control_par(get_ui_id($voice_stealing_mode), $CONTROL_PAR_POS_X, 502)
+    set_control_par(get_ui_id($voice_stealing_mode), $CONTROL_PAR_POS_Y, 2)
+    set_control_par(get_ui_id($note_doubling_mode), $CONTROL_PAR_POS_X, 502)
+    set_control_par(get_ui_id($note_doubling_mode), $CONTROL_PAR_POS_Y, 23)
+    set_control_par(get_ui_id($note_doubling_cc), $CONTROL_PAR_POS_X, 590)
+    set_control_par(get_ui_id($note_doubling_cc), $CONTROL_PAR_POS_Y, 23)
+    set_control_par(get_ui_id($low_limit), $CONTROL_PAR_POS_X, 502)
+    set_control_par(get_ui_id($low_limit), $CONTROL_PAR_POS_Y, 44)
+    set_control_par(get_ui_id($high_limit), $CONTROL_PAR_POS_X, 575)
+    set_control_par(get_ui_id($high_limit), $CONTROL_PAR_POS_Y, 44)
+    //set_control_par(get_ui_id($channel_offset_label), $CONTROL_PAR_POS_X, 428)
+    //set_control_par(get_ui_id($channel_offset_label), $CONTROL_PAR_POS_Y, 65)
+    set_control_par(get_ui_id($channel_out_offset), $CONTROL_PAR_POS_X, 502)
+    set_control_par(get_ui_id($channel_out_offset), $CONTROL_PAR_POS_Y, 65)    
     set_control_par(get_ui_id($mono_passthrough), $CONTROL_PAR_POS_X, 475)
     set_control_par(get_ui_id($mono_cc), $CONTROL_PAR_POS_X, 520)
-    set_control_par(get_ui_id($mono_threshold), $CONTROL_PAR_POS_X, 585)    
-    set_control_par(get_ui_id($mono_enabled), $CONTROL_PAR_POS_Y, 86)
+    set_control_par(get_ui_id($mono_threshold), $CONTROL_PAR_POS_X, 585)      
     set_control_par(get_ui_id($mono_passthrough), $CONTROL_PAR_POS_Y, 86)
     set_control_par(get_ui_id($mono_cc), $CONTROL_PAR_POS_Y, 86)
     set_control_par(get_ui_id($mono_threshold), $CONTROL_PAR_POS_Y, 86)
-    set_control_par(get_ui_id($debug_auto_clear), $CONTROL_PAR_POS_X, 520)
+    set_control_par(get_ui_id($debug_auto_clear), $CONTROL_PAR_POS_X, 502)
     set_control_par(get_ui_id($debug_auto_clear), $CONTROL_PAR_POS_Y, 86)
     set_control_par(get_ui_id($debug_clear), $CONTROL_PAR_POS_X, 585)
     set_control_par(get_ui_id($debug_clear), $CONTROL_PAR_POS_Y, 86)
@@ -457,8 +479,7 @@ function GetMostRecentHeldNote
             $time_compare := %held_notes[$i]
         end if
         inc($i)
-    end while
-    message("newest: " & $r0)
+    end while    
 end function
 
 {GetOldestHeldNote - Determines the note number of the earliest note that was pressed
@@ -491,8 +512,7 @@ function GetOldestHeldNote
             %held_notes[$i] := %held_notes[$i]
         end if
         inc($i)
-    end while
-    message("oldest: " & $r0)
+    end while    
 end function
 
 {GetClosestHeldNote - Determines the note number of the held note that is closest to the given note
@@ -809,8 +829,8 @@ function DistributeNotesToVoices
         inc($i)
     end while
 
-    {Distribute only the minimum number of voices if we're in drop-lower voices mode, and unison mode is not active}
-    if ($note_doubling_mode = $DROP_LOWER_VOICES and ($mono_enabled = $FALSE or $current_mono_cc_val < $mono_threshold))
+    {Distribute only the minimum number of voices if we're in drop-lower/higher voices mode, and unison mode is not active}
+    if (($note_doubling_mode = $DROP_HIGHER_VOICES or $note_doubling_mode = $DROP_LOWER_VOICES) and ($mono_enabled = $FALSE or $current_mono_cc_val < $mono_threshold))
         call SetHeldNotesIteratorToFront()
         $i := 0
         while ($i < $held_notes_count and $i < $max_voices)
@@ -849,8 +869,20 @@ function DistributeNotesToVoices
         end select
     end if
 
-   {Sort descending so that low instruments on high midi channels play low notes.}
-   sort(%temp_voices, 1) {1 = sort descending}
+    {Sort descending so that low instruments on high midi channels play low notes, unless we're in DROP_HIGHER_VOICES note doubling mode}
+    sort(%temp_voices, 1) {1 = sort descending}
+
+
+    {If dropping higher voices, we need to shift the active notes and sort so that }
+    if ($note_doubling_mode = $DROP_HIGHER_VOICES)
+        sort(%temp_voices, 0, 0, $max_voices - 1) {0 = sort ascending}
+        $i := 0
+        while (%temp_voices[$i] = -1)
+            inc($i)
+        end while
+        sort(%temp_voices, 1, $i, $max_voices - 1) {1 = sort descending}
+    end if
+    message(%temp_voices[3])
 end function
 
 {KillReleasedNotes: queues a note-off for any voice that is playing a note that is no longer held.
@@ -876,7 +908,7 @@ function SendMIDICommands
     while ($i < $max_voices) {Process each voice}
 
     	@debug_msg := "%temp_voices[$i] " & %temp_voices[$i]
-        call PrintDebug()    
+        call PrintDebug()
 
         if (%temp_voices[$i] # %voices[$i]) {Skip this voice if it's being told to play the note it's already playing}
 
@@ -888,7 +920,7 @@ function SendMIDICommands
                 call PrintDebug()          
 
             else 
-                if(%temp_voices[$i] # -1) {Process a note-on}
+                if(%temp_voices[$i] # -1) {Process a note-on}                    
                     {Note-ons should be processed before note-offs to enable legato transitions}
                     {Always send note-ons with using the velocity of the most recently played note, or else note-ons that occur
                     as a result of re-voicings could create jarring/unwanted velocities.}
@@ -1007,6 +1039,11 @@ on midi_in
     	if (($MIDI_COMMAND = $MIDI_COMMAND_CC) and ($MIDI_BYTE_1 = $mono_cc))
     		$current_mono_cc_val := $MIDI_BYTE_2 {Store the value to later compare against the threshold.}
     	end if
+
+        {This is the Note doubling CC}
+        if (($MIDI_COMMAND = $MIDI_COMMAND_CC) and ($MIDI_BYTE_1 = $note_doubling_cc))
+            $note_doubling_mode := real_to_int((int_to_real($MIDI_BYTE_2) / 127.0) * int_to_real($DROP_LOWER_VOICES))
+        end if
 
         {This is a note on or off outside the divisi area}        
         if (($MIDI_COMMAND = $MIDI_COMMAND_NOTE_ON) or ($MIDI_COMMAND = $MIDI_COMMAND_NOTE_OFF))
